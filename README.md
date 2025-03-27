@@ -27,7 +27,6 @@ link to their contributions in all repos here. -->
 | Team member 1                   |                 |                                    |
 | Team member 2                   |                 |                                    |
 | Team member 3                   |                 |                                    |
-| Team member 4 (if there is one) |                 |                                    |
 
 
 
