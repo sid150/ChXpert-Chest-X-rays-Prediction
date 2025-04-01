@@ -78,6 +78,22 @@ and which optional "difficulty" points you are attempting. -->
 
 <!-- Make sure to clarify how you will satisfy the Unit 6 and Unit 7 requirements, 
 and which optional "difficulty" points you are attempting. -->
+Serving from an API endpoint:
+	Use FastAPI in conjunction with the frontend and pytorch vision model.
+Identify requirements:
+	Model Size: TBD
+	Single Sample Online Inference Latency: less than 1 second
+	Cloud Deployment Concurrency: 4
+	These requirements are determined from a single business/clinic accessing the vision model.
+ 
+Model optimizations to satisfy requirements:
+	Convert pytorch model to ONNX model and run with ONNX runtime to compare inference times. Compare the regular ONNX model with the dynamically quantized model. Other optimizations may be tested as the project progresses. 
+
+System optimizations to satisfy requirements:
+	Attempt to use Triton inference server with multiple GPUs with both python backend and ONNX backend to compare performance. 
+
+Develop multiple options for serving(EXTRA DIFFICULTY POINTS):
+	Compare multiple local on-device machine performance with server-grade CPU inference performance. 
 
 #### Data pipeline
 
