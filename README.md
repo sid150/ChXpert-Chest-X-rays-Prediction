@@ -78,6 +78,7 @@ and which optional "difficulty" points you are attempting. -->
 
 <!-- Make sure to clarify how you will satisfy the Unit 6 and Unit 7 requirements, 
 and which optional "difficulty" points you are attempting. -->
+##### Unit 6:
 Serving from an API endpoint:
 	Use FastAPI in conjunction with the frontend and pytorch vision model.
 Identify requirements:
@@ -94,6 +95,24 @@ System optimizations to satisfy requirements:
 
 Develop multiple options for serving(EXTRA DIFFICULTY POINTS):
 	Compare multiple local on-device machine performance with server-grade CPU inference performance. 
+
+##### Unit 7:
+(Note, no lab performed yet, will update accordingly once experience is had)
+Offline evaluation of model:
+	Create automated evaluation plan in conjunction with MLFlow for metrics logging. Create concurrency tests and cloud tests for domain specific use cases, and also a simple standard use case. Test on special test batches of data that was highly misclassified(some certain disease). 
+	Finally automatically save and register the model if passing evaluation criteria.
+Load test in staging:
+	This will be part of continuous X pipeline, and like the model serving lab, multiple requests will be made concurrently to simulate the real-world use case described in the business-specific evaluation part. 
+
+Online evaluation in canary stage:
+	Figure out a way to replicate real world users on certain device types. Similar to load test stage, run concurrent inference tasks as defined by business-specific evaluation and analyze results to see if they meet the requirements posed. Methods used will be similar to lab 7.
+
+Close the loop:
+	On the front-end website, users uploading X-rays for model prediction will be given a choice of buttons to choose from indicating whether the model’s prediction was accurate or not. This will simulate doctor’s opinion on the X-ray classification and generate new online data with ground truth labels. 
+
+Define a business-specific evaluation:
+	Deploy in production the model inference service to half of users. Measure, and log the inference latencies. Compare these inference latencies to the accuracy and time it takes for physicians/doctors to notice issues in X-ray. Additionally, evaluate the time saved by using automated model inference on X-rays instead of relying on time it takes for x-ray to be sent to a physician computer, then opened and checked once a doctor is available. Hopefully, this will showcase a benefit of using this ML system to detect issues in X-rays automatically instead of having to spend precious time and human resources to figure out whether an X-ray and patient need to be examined in further detail. 
+
 
 #### Data pipeline
 
