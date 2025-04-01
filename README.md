@@ -98,19 +98,19 @@ Develop multiple options for serving(EXTRA DIFFICULTY POINTS):
 
 ##### Unit 7:
 (Note, no lab performed yet, will update accordingly once experience is had)
-<u>Offline evaluation of model:</u>
+<ins>Offline evaluation of model:</ins>
 	Create automated evaluation plan in conjunction with MLFlow for metrics logging. Create concurrency tests and cloud tests for domain specific use cases, and also a simple standard use case. Test on special test batches of data that was highly misclassified(some certain disease). 
 	Finally automatically save and register the model if passing evaluation criteria.
-<u>Load test in staging:</u>
+<ins>Load test in staging:</ins>
 	This will be part of continuous X pipeline, and like the model serving lab, multiple requests will be made concurrently to simulate the real-world use case described in the business-specific evaluation part. 
 
-<u>Online evaluation in canary stage:</u>
+<ins>Online evaluation in canary stage:</ins>
 	Figure out a way to replicate real world users on certain device types. Similar to load test stage, run concurrent inference tasks as defined by business-specific evaluation and analyze results to see if they meet the requirements posed. Methods used will be similar to lab 7.
 
-<u>Close the loop:</u>
+<ins>Close the loop:</ins>
 	On the front-end website, users uploading X-rays for model prediction will be given a choice of buttons to choose from indicating whether the model’s prediction was accurate or not. This will simulate doctor’s opinion on the X-ray classification and generate new online data with ground truth labels. 
 
-<u>Define a business-specific evaluation:</u>
+<ins>Define a business-specific evaluation:</ins>
 	Deploy in production the model inference service to half of users. Measure, and log the inference latencies. Compare these inference latencies to the accuracy and time it takes for physicians/doctors to notice issues in X-ray. Additionally, evaluate the time saved by using automated model inference on X-rays instead of relying on time it takes for x-ray to be sent to a physician computer, then opened and checked once a doctor is available. Hopefully, this will showcase a benefit of using this ML system to detect issues in X-rays automatically instead of having to spend precious time and human resources to figure out whether an X-ray and patient need to be examined in further detail. 
 
 
@@ -119,16 +119,16 @@ Develop multiple options for serving(EXTRA DIFFICULTY POINTS):
 <!-- Make sure to clarify how you will satisfy the Unit 8 requirements,  and which 
 optional "difficulty" points you are attempting. -->
 
-<u>Persistent Storage:</u>
+<ins>Persistent Storage:</ins>
 	Following Lab 8, we will use persistent storage through Chameleon, and we will store the main dataset of around 400+ Gigabytes, model checkpoints, the CNN model and ViT model, and container images for inferencing. 
 
-<u>Offline data:</u>
+<ins>Offline data:</ins>
 	We will keep unstructured training data of Chest X-ray images in a repository of persistent storage as defined above.
 
-<u>Data pipelines:</u>
+<ins>Data pipelines:</ins>
 	We have a simple ETL pipeline due to using image classification, we will convert the images into the proper input size by resizing to the required shape and still stored as images. During model training or inferencing, the data will be converted to pytorch tensor and normalized. Data source is CheXpert dataset of image files, and resizing will be done through the Pillow library function. 
 
-<u>Online data:</u>
+<ins>Online data:</ins>
 	In order to evaluate our MLOps system for chest X-ray image classification in a real-time environment, we will simulate the arrival of "online data", mimicking the behavior of X-ray images being submitted in a clinical setting for inference. This simulation is critical to test the robustness, latency, and scalability of our streaming pipeline and inference service.
 We will implement a Python-based data simulator that reads X-ray images from a local directory and sends them to our deployed inference API endpoint. The script will simulate two types of data arrival patterns, single and batch. Simulated data will be data not form CheXpert dataset but other similar positional images of chest X-rays with the ground truth label supplied of either having a medical issue or not. These new images should have an inference performed on them and then put into a folder for future model-retraining if necessary. 
 
