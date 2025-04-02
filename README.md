@@ -1,8 +1,5 @@
 # ChXpert-Chest-X-rays-Prediction
 
-
-## Title of project
-
 <!-- 
 Discuss: Value proposition: Your will propose a machine learning system that can be 
 used in an existing business or service. (You should not propose a system in which 
