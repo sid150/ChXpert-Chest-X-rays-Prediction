@@ -183,5 +183,54 @@ We will implement a Python-based data simulator that reads X-ray images from a l
 
 <!-- Make sure to clarify how you will satisfy the Unit 3 requirements,  and which 
 optional "difficulty" points you are attempting. -->
+#### Containerized & Microservice-Based System  
+
+<ins>Data Ingestion:</ins>  
+A microservice fetches and preprocesses X-ray images, storing them in **Chameleon Cloud**.  
+
+<ins>Model Training:</ins>  
+Runs in a **containerized environment** on Chameleon Cloud using **Ray Train** and **Jupyter Notebooks** for experimentation.  
+**Containerized batch jobs** handle production training.  
+
+<ins>Model Serving:</ins>  
+The trained model is deployed as a **REST API** using **FastAPI**.  
+Runs inside a **Kubernetes (K8s) cluster** for scalability.  
+
+<ins>Immutable Deployments:</ins>  
+All infrastructure and configurations are **defined in Git** and **version-controlled**.  
+Changes are applied automatically **without manual intervention**.  
+
+#### CI/CD and Continuous Training Pipeline  
+
+<ins>Triggering Mechanisms:</ins>  
+A **new dataset upload** or a **Git commit** to the model repository triggers the pipeline.  
+Automated **retraining jobs** are scheduled periodically using **GitHub Actions**.  
+
+<ins>Pipeline Workflow:</ins>  
+1. **Data Preprocessing & Augmentation**  
+   Raw X-ray images are **cleaned, normalized, and augmented** before training.  
+
+2. **Model Training & Validation**  
+   The model is trained inside a **containerized Chameleon Cloud instance** using **PyTorch** with **GPU acceleration**.  
+
+3. **Evaluation & Optimization**  
+   Performance is assessed using metrics like **AUC** and **F1-score**.  
+   **Quantization** or **pruning** is applied for efficient inference.  
+
+4. **Model Packaging & Registry**  
+   The best-performing model is stored in **MLFlow** for versioning and management.  
+
+5. **Deployment Automation:**  
+   The new model is **containerized** and **deployed automatically** to the **staging environment**.  
+
+#### Staged Deployment Strategy  
+
+<ins>Staging Environment:</ins>  
+The updated model is tested in a **sandboxed Chameleon Cloud instance**.  
+A subset of **traffic is routed** to the new model while monitoring **real-time performance metrics** (e.g., inference latency, prediction correctness).  
+
+<ins>Production Deployment:</ins>  
+Once validated, the model is **fully deployed** on a **Kubernetes cluster** for **scalable and robust production use**.  
+
 
 
