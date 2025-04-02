@@ -90,10 +90,42 @@ The table below shows an example, it is not a recommendation. -->
 diagram, (3) justification for your strategy, (4) relate back to lecture material, 
 (5) include specific numbers. -->
 
-#### Model training and training platforms
+#### Model Training and Training Platforms
 
-<!-- Make sure to clarify how you will satisfy the Unit 4 and Unit 5 requirements, 
-and which optional "difficulty" points you are attempting. -->
+##### Unit 4: Model Training at Scale
+
+###### Train and Re-train
+
+We use DenseNet121 and ViT-Large as our baseline models for the chest X-ray classification task. Both models are publicly available and can be imported directly from open-source libraries such as `torchvision.models` (for DenseNet121) and Hugging Face Transformers (for ViT-Large). Our dataset is the CheXpert dataset, an open-source chest X-ray dataset released by Stanford, which contains over 224,000 chest radiographs from 65,000+ patients, occupying approximately 450 GB of storage. If storage limitations arise, we will work with a reduced, representative sample of the dataset.
+
+To support training and re-training, we store the dataset using Chameleon’s persistent volume block storage, which allows seamless mounting of data across training nodes. Each model is modified by adding a small multi-label classification head suitable for the CheXpert task, and we experiment with two approaches for DenseNet: fine-tuning the pretrained model and training from scratch using randomly initialized weights. For ViT-Large, we will only stick with fine-tuning the full network and fine-tuning the last few layers. The dataset is split into training and re-training subsets to simulate a real-world continual learning pipeline. After training, we compare the performance of the two models to determine which performs better on this task.
+
+###### Modeling
+
+We selected DenseNet121 due to its widespread use in chest X-ray classification and its relatively small size of 7.98 million parameters, which enables it to run on low-end GPUs and complete training quickly. This makes DenseNet an ideal choice for establishing a fast and reliable baseline. On the other hand, we use ViT-Large, which has approximately 307 million parameters, as a high-capacity model capable of leveraging the large CheXpert dataset. Its self-attention mechanism allows ViT-Large to capture long-range dependencies across the image, making it well-suited for detecting subtle and diffuse abnormalities such as cardiomegaly and infiltrates, which span larger spatial regions in radiographs.
+
+As ViT-Large cannot run on a single low-end GPU, we will leverage training strategies discussed in Unit 4 such as gradient accumulation, reduced precision (float16), and mixed precision training using AMP. Furthermore, we will experiment with parameter-efficient fine-tuning methods like LoRA and QLoRA, which allow us to fine-tune only a small number of parameters, making large-model fine-tuning feasible within limited memory constraints.
+
+###### Attempting Difficulty Points
+
+To satisfy the “training strategies for large models” requirement, we use ViT-Large to test various techniques including gradient accumulation, mixed precision training, and LoRA/QLoRA. These methods are designed to reduce memory usage and speed up training without compromising model performance. We will conduct experiments measuring the impact of each strategy on memory footprint, training time, and validation AUROC, and report the results using plots and metrics similar to those used in the Unit 4 lab assignment.
+
+We will also attempt to “use distributed training to increase velocity.” For DenseNet121, we can apply DistributedDataParallel (DDP) across multiple GPUs and evaluate how it scales with 1, 2, and 4 GPUs. For ViT-Large, we aim to use FullyShardedDataParallel (FSDP) to reduce memory consumption and enable large-scale fine-tuning. In both cases, we will measure training time per epoch and throughput (images per second) and plot these against the number of GPUs used to evaluate scaling efficiency.
+
+---
+
+##### Unit 5: Model Training Infrastructure and Platform
+
+###### Experiment Tracking
+
+We will track all experiments using MLflow, including model configurations, hyperparameters, training time, memory usage, and performance metrics. Our experiments include training DenseNet121 from scratch versus fine-tuning, as well as full and partial fine-tuning of ViT-Large. For each model, we will perform sweeps over learning rates (e.g., 1e-3, 1e-4, 5e-5) and batch sizes (e.g., 4, 8, 16, depending on GPU memory). We closely monitor GPU utilization, epoch duration, and memory usage to optimize training efficiency.
+
+The main metric we use to evaluate model performance is the Area Under the ROC Curve (AUC), which is standard in medical classification tasks. For each experiment, we log per-class AUC scores along with training curves to assess overfitting and generalization. By systematically comparing these logs, we can select the best hyperparameter settings for each model.
+
+###### Scheduling Training Jobs
+
+We will use Ray Train to schedule and manage distributed training jobs across multiple nodes on Chameleon Cloud. Ray provides a clean abstraction over PyTorch, allowing us to launch training runs using DDP or FSDP with minimal code changes. We will run a Ray cluster and submit jobs to it as part of our continuous training pipeline, which lets us queue experiments such as LoRA vs. QLoRA, AMP vs. FP32, and different GPU counts. This setup helps us maximize cluster utilization and accelerate experimentation.
+
 
 #### Model serving and monitoring platforms
 
