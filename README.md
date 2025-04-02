@@ -12,6 +12,27 @@ status quo used in the business or service? What business metric are you going t
 judged on? (Note that the “service” does not have to be for general users; you can 
 propose a system for a science problem, for example.)
 -->
+Value Proposition
+We propose to develop an online machine learning system for automated classification of chest X-rays to detect the presence of any potential abnormality from a list of 14 pathologies, such as cardiomegaly, edema, pneumonia, and pleural effusion. The goal is to integrate this tool into existing radiology workflows in hospitals and diagnostic labs, where it can assist radiologists by prioritizing scans likely to contain critical findings.
+
+In the current non-ML status quo, all X-rays are manually reviewed by radiologists, regardless of their diagnostic complexity or urgency. This creates a bottleneck, especially in high-volume clinical settings, leading to delays in the diagnosis and treatment of patients with serious conditions.
+
+Our system addresses this issue by automatically screening all incoming chest X-rays and assigning a priority score based on the model's confidence in the presence of any abnormality. Images flagged as high-risk (potentially abnormal) will be placed at the top of the radiologist's review queue, enabling faster intervention for patients who need it most. Importantly, scans predicted as benign are not excluded from human review, but are instead deprioritized and reviewed with relative leisure. This ensures that the human-in-the-loop workflow is maintained while leveraging automation for triage.
+
+To ensure long-term adaptability and performance, we will develop an end-to-end, cloud-native retraining pipeline. In this system, once a radiologist has reviewed a scan, their final diagnosis (the true label) is stored and automatically fed back into the system. This labeled data becomes part of the continual learning pipeline, allowing the model to retrain periodically on the most recent, high-quality labeled examples. This process enhances the system’s sensitivity (true positive rate) and overall robustness over time by correcting any systematic biases or emerging distribution shifts.
+
+Because this system operates in a medical decision support context, model performance must meet strict clinical standards. The key concern is minimizing false negatives — cases where the model incorrectly classifies an abnormal scan as normal — as these can lead to missed diagnoses. Therefore, the model will be evaluated primarily using Area Under the ROC Curve (AUROC), which reflects the model's ability to rank abnormal cases ahead of normal ones. In addition to AUROC, we will monitor other classification metrics such as sensitivity (recall), specificity, precision, and F1 score, with a particular emphasis on high recall to ensure minimal missed detections.
+
+The proposed system can be valuable in multiple real-world scenarios:
+
+Hospitals and diagnostic centers, where radiologist bandwidth is limited.
+
+Teleradiology services, where scans from multiple locations are reviewed remotely.
+
+Health insurance companies, where initial ML-based assessments could help streamline the process of verifying diagnoses before approving claims, thereby reducing claim processing time.
+
+While the deployment of such a system raises important ethical and regulatory considerations — especially regarding trust, liability, and transparency — these challenges are acknowledged and are beyond the current project’s technical scope.
+
 
 ### Contributors
 
