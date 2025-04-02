@@ -57,18 +57,14 @@ link to their contributions in all repos here. -->
 Must include: all the hardware, all the containers/software platforms, all the models, 
 all the data. -->
 
-### Summary of outside materials
+### Summary of Outside Materials
 
-<!-- In a table, a row for each dataset, foundation model. 
-Name of data/model, conditions under which it was created (ideally with links/references), 
-conditions under which it may be used. -->
+| Name                         | How it was created                                                                                                                                   | Conditions of use                                                                                                     |
+|------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
+| **CheXpert**                 | Created by Stanford ML Group using 224,316 chest radiographs from 65,240 patients at Stanford Hospital. Labels were extracted using NLP from reports. [Paper](https://arxiv.org/abs/1901.07031) | Openly available for **research purposes only**. Requires acceptance of [data use agreement](https://stanfordmlgroup.github.io/competitions/chexpert/) |
+| **DenseNet121 (ImageNet)**   | Trained on ImageNet-1k dataset by the original DenseNet authors. Available in `torchvision.models`. [Paper](https://arxiv.org/abs/1608.06993)        | Licensed under [BSD 3-Clause License](https://github.com/pytorch/vision/blob/main/LICENSE); free for research and commercial use |
+| **ViT-Large (ImageNet-21k)** | Pretrained by Google Research on ImageNet-21k (14M images), optionally fine-tuned on ImageNet-1k. Available via Hugging Face. [Paper](https://arxiv.org/abs/2010.11929) | Licensed under [Apache 2.0 License](https://github.com/google-research/vision_transformer); free for research and commercial use |
 
-|              | How it was created | Conditions of use |
-|--------------|--------------------|-------------------|
-| CheXpert Dataset form Stanford ML   |  |                    |
-| Data set 2   |                    |                   |
-| Base model 1 |                    |                   |
-| etc          |                    |                   |
 
 
 ### Summary of infrastructure requirements
