@@ -72,10 +72,10 @@ The table below shows an example, it is not a recommendation. -->
 
 | Requirement     | How many/when                                     | Justification |
 |-----------------|---------------------------------------------------|---------------|
-| `m1.medium` VMs | 3 for entire project duration                     | ...           |
-| `gpu_mi100`     | 4 hour block twice a week                         |               |
-| Floating IPs    | 1 for entire project duration, 1 for sporadic use |               |
-| etc             |                                                   |               |
+| `compute_icelake_650r` VMs | 3 for entire project duration   | Need at least 1 server with persistent storage of greater than 450 GB due to dataset    |
+| `gpu_V100`     | 4 hour block twice a week  | ViT model training               |
+| Floating IPs    | 1 for entire project duration, 1 for sporadic use |                |
+
 
 ### Detailed design plan
 
