@@ -41,9 +41,9 @@ link to their contributions in all repos here. -->
 
 | Name                            | Responsible for				 | Link to their commits in this repo |
 |---------------------------------|----------------------------------------------|------------------------------------|
-| Aditya Gouroju                  | Model training and training infrastructure   |                                    |
-| Ruchit Jathania                 | Model Serving/Monitoring			 |                                    |
-| Sidharth Jain                   | Data Pipeline 				 |                                    |
+| Aditya Gouroju                  | Model training and training infrastructure   |       https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/commits/main/?author=agouroju                             |
+| Ruchit Jathania                 | Model Serving/Monitoring			 |     https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/commits/main/?author=RuchitJathania                               |
+| Sidharth Jain                   | Data Pipeline 				 |      https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/commits/main/?author=sid150                              |
 
 
 
