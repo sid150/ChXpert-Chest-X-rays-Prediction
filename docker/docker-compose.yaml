@@ -1,0 +1,68 @@
+volumes:
+  cheXpert:
+services:
+  chexpert_downloader:
+    image: ubuntu:20.04
+    container_name: chexpert_downloader
+    volumes:
+      - cheXpert:/data  # Mount the current directory to /data in the container
+    working_dir: /data
+    entrypoint: >
+      sh -c "
+        echo 'Updating package list...'
+        apt-get update &&
+
+        echo 'Installing required packages (wget, tar, unzip)...'
+        apt-get install -y wget tar curl unzip &&
+
+        echo 'Downloading AzCopy...'
+        wget https://aka.ms/downloadazcopy-v10-linux -O azcopy.tar.gz &&
+
+        echo 'Extracting AzCopy...'
+        tar -xvf azcopy.tar.gz &&
+
+        echo 'Moving AzCopy binary to /usr/bin...'
+        cp ./azcopy_linux_amd64_*/azcopy /usr/bin/ &&
+        chmod +x /usr/bin/azcopy &&
+
+        echo 'Cleaning up temporary files...'
+        rm -rf azcopy.tar.gz azcopy_linux_amd64_* &&
+
+        echo 'Starting dataset download with AzCopy...'
+        azcopy copy 'https://aimistanforddatasets01.blob.core.windows.net/chexpertchestxrays-u20210408?sv=2019-02-02&sr=c&sig=l%2FavBKx%2BZYBNaNTk%2F3SGgYhwrlMjhPy%2FCeq9mq858ZU%3D&st=2025-04-18T15%3A50%3A48Z&se=2025-05-18T15%3A55%3A48Z&sp=rl' . --recursive &&
+
+        echo 'Dataset download complete! Listing contents of /data:'
+        ls -lh /data &&
+
+        echo 'Now unzipping the file...'
+        unzip chexpertchestxrays-u20210408/'CheXpert-v1.0 batch 1 (validate & csv).zip' -d chexpertchestxrays-u20210408 &&
+        rm -rf chexpertchestxrays-u20210408/'CheXpert-v1.0 batch 1 (validate & csv).zip' &&
+        echo 'Unzipping complete! Listing contents of /data:'
+        ls -lh /data
+      "
+  load-data:
+    container_name: etl_load_data
+    image: rclone/rclone:latest
+    volumes:
+      - cheXpert:/data
+      - ~/.config/rclone/rclone.conf:/root/.config/rclone/rclone.conf:ro
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        if [ -z "$RCLONE_CONTAINER" ]; then
+          echo "ERROR: RCLONE_CONTAINER is not set"
+          exit 1
+        fi
+        echo "Cleaning up existing contents of container..."
+        rclone delete chi_tacc:$RCLONE_CONTAINER --rmdirs || true
+
+        rclone copy /data/chexpertchestxrays-u20210408 chi_tacc:$RCLONE_CONTAINER \
+        --progress \
+        --transfers=32 \
+        --checkers=16 \
+        --multi-thread-streams=4 \
+        --fast-list
+
+        echo "Listing directories in container after load stage:"
+        rclone lsd chi_tacc:$RCLONE_CONTAINER
