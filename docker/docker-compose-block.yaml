@@ -21,7 +21,8 @@ services:
     volumes:
       - /mnt/block/minio_data:/data
 
-  minio-create-bucket:
+  # Create both 'mlflow-artifacts' and 'ray' buckets
+  minio-create-buckets:
     image: minio/mc
     depends_on:
       minio:
@@ -31,10 +32,17 @@ services:
       mc alias set minio http://minio:9000 your-access-key your-secret-key &&
       if ! mc ls minio/mlflow-artifacts; then
         mc mb minio/mlflow-artifacts &&
-        echo 'Bucket mlflow-artifacts created'
+        echo 'Bucket mlflow-artifacts created';
       else
         echo 'Bucket mlflow-artifacts already exists';
+      fi &&
+      if ! mc ls minio/ray; then
+        mc mb minio/ray &&
+        echo 'Bucket ray created';
+      else
+        echo 'Bucket ray already exists';
       fi"
+
 
   postgres:
     image: postgres:latest
