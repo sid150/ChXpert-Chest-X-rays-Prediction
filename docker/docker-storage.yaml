@@ -36,7 +36,7 @@ services:
         echo 'Bucket mlflow-artifacts created';
       else
         echo 'Bucket mlflow-artifacts already exists';
-      fi &&
+      fi;
       if ! mc ls minio/ray; then
         mc mb minio/ray &&
         echo 'Bucket ray created';
