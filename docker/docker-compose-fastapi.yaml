@@ -1,0 +1,37 @@
+services:
+  fastapi_server:
+    build:
+      context: ./FastApi                # needs to be changed
+      dockerfile: Dockerfile
+    container_name: fastapi_server
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./FastApi/demoModel.pth:/app/demoModel.pth
+
+  flask:
+    build:
+      context: ./chexpertService       # needs to be changed
+      dockerfile: Dockerfile
+    container_name: flask
+    ports:
+      - "80:5000"
+    environment:
+      - FASTAPI_SERVER_URL=http://fastapi_server:8000
+
+  jupyter:
+    image: quay.io/jupyter/minimal-notebook:latest
+    container_name: jupyter
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./workspace:/home/jovyan/work       # change to mount workspace later
+    command: >
+      bash -c "pip install numpy requests matplotlib && start-notebook.sh"
