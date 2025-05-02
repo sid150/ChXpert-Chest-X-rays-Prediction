@@ -8,9 +8,13 @@ services:
       resources:
         reservations:
           devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+            - driver: ${GPU_DRIVER:-none}
+              count: ${GPU_COUNT:-0}
+              capabilities: [ "gpu" ]
+#          devices:
+#            - driver: nvidia
+#              count: all
+#              capabilities: [gpu]
     ports:
       - "8000:8000"
 #    volumes:
