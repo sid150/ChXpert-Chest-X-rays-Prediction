@@ -1,7 +1,7 @@
 services:
   fastapi_server:
     build:
-      context: ./fastApi_onnx                # needs to be changed
+      context: ./fastAPI_onnx                # needs to be changed
       dockerfile: Dockerfile
     container_name: fastapi_server
     deploy:
