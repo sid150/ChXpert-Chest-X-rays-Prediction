@@ -1,7 +1,7 @@
 services:
   fastapi_server:
     build:
-      context: ./fastAPI                # needs to be changed
+      context: ../fastAPI                # needs to be changed
       dockerfile: Dockerfile
     container_name: fastapi_server
     deploy:
@@ -18,7 +18,7 @@ services:
 
   flask:
     build:
-      context: ./chexpertService       # needs to be changed
+      context: ../chexpertService       # needs to be changed
       dockerfile: Dockerfile
     container_name: flask
     ports:
