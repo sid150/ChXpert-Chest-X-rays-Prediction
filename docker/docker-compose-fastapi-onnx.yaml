@@ -2,7 +2,7 @@ services:
   fastapi_server:
     build:
       context: ../fastAPI_onnx                # needs to be changed
-      dockerfile: Dockerfile
+      dockerfile: DockerFile
     container_name: fastapi_server
     deploy:
       resources:
@@ -19,7 +19,7 @@ services:
   flask:
     build:
       context: ../chexpertService       # needs to be changed
-      dockerfile: Dockerfile
+      dockerfile: DockerFile
     container_name: flask
     ports:
       - "80:5000"
