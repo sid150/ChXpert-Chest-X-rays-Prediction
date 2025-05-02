@@ -4,13 +4,9 @@ services:
       context: ../fastAPI                # needs to be changed
       dockerfile: DockerFile
     container_name: fastapi_server
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: ${GPU_DRIVER:-none}
-              count: ${GPU_COUNT:-0}
-              capabilities: [ "gpu" ]
+#    deploy:
+#      resources:
+#        reservations:
 #          devices:
 #            - driver: nvidia
 #              count: all

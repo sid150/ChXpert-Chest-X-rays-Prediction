@@ -1,16 +1,16 @@
 services:
   fastapi_server:
     build:
-      context: ../fastAPI_onnx                # needs to be changed
+      context: ../fastAPI                # needs to be changed
       dockerfile: DockerFile
     container_name: fastapi_server
-#    deploy:
-#      resources:
-#        reservations:
-#            devices:
-#              - driver: nvidia
-#                count: all
-#                capabilities: [gpu]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     ports:
       - "8000:8000"
 #    volumes:
