@@ -22,12 +22,12 @@ services:
       dockerfile: DockerFile
     container_name: flask
     ports:
-      - "80:5000"
+      - "5050:5050"
     environment:
       - FASTAPI_SERVER_URL=http://fastapi_server:8000
 
   jupyter:
-    image: quay.io/jupyter/minimal-notebook:latest
+    image: quay.io/jupyter/pytorch-notebook:pytorch-2.5.1
     container_name: jupyter
     ports:
       - "8888:8888"
