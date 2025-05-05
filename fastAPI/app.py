@@ -81,7 +81,7 @@ def predict_image(request: ImageRequest):
             predicted_class = torch.argmax(probabilities, 1).item()
             confidence = probabilities[0, predicted_class].item()  # Get the probability
 
-        return PredictionResponse(prediction=classes[predicted_class], probability=confidence)
+        return PredictionResponse(prediction=[classes[predicted_class]], probability=[confidence])
 
     except Exception as e:
         return {"error": str(e)}
