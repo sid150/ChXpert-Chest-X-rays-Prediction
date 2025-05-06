@@ -8,8 +8,12 @@ import base64
 app = Flask(__name__)
 
 os.makedirs(os.path.join(app.instance_path, 'uploads'), exist_ok=True)
-
-FASTAPI_SERVER_URL = os.environ['FASTAPI_SERVER_URL']  # New: FastAPI server URL
+# FASTAPI_SERVER_URL = os.environ['FASTAPI_SERVER_URL']
+# print(FASTAPI_SERVER_URL)
+if 'FASTAPI_SERVER_URL' in os.environ:
+    FASTAPI_SERVER_URL = os.environ['FASTAPI_SERVER_URL']  # New: FastAPI server URL
+else:
+    FASTAPI_SERVER_URL = "http://127.0.0.1:8000"
 
 
 # New! for making requests to FastAPI
@@ -25,10 +29,17 @@ def request_fastapi(image_path):
         response.raise_for_status()
 
         result = response.json()
-        predicted_class = result.get("prediction")
-        probability = result.get("probability")
+        print("result: ", result)
+        # predicted_class = result.get("prediction")
+        # probability = result.get("probability")
+        # predicted_class = result.get("predictions", [None])[0]
+        # probability = result.get("probabilities", [None])[0]
 
-        return predicted_class, probability
+        # return predicted_class, probability
+        predicted_classes = result.get("predictions", [])
+        probabilities = result.get("probabilities", [])
+
+        return predicted_classes, probabilities
 
     except Exception as e:
         print(f"Error during inference: {e}")
@@ -42,21 +53,41 @@ def index():
 
 @app.route('/predict', methods=['GET', 'POST'])
 def upload():
-    preds = None
+    preds, probs = None, None
     if request.method == 'POST':
         f = request.files['file']
         f.save(os.path.join(app.instance_path, 'uploads', secure_filename(f.filename)))
         img_path = os.path.join(app.instance_path, 'uploads', secure_filename(f.filename))
 
         preds, probs = request_fastapi(img_path)
-        print("📤 Uploaded image path:", img_path)
-        print("✅ FastAPI returned:", preds, probs)
+        print("Uploaded image path:", img_path)
+        print("FastAPI returned:", preds, probs)
 
-        if preds:
-            return f'<button type="button" class="btn btn-info btn-sm">{preds}</button>'
+    #     if preds:
+    #         return f'<button type="button" class="btn btn-info btn-sm">{preds}</button>'
+    #
+    # return '<a href="#" class="badge badge-warning">Warning</a>'
+    if preds and probs:
+        # Find the top prediction
+        top_idx = probs.index(max(probs))
+        top_label = preds[top_idx]
+        top_confidence = probs[top_idx]
 
+        # Create left-aligned output
+        output_html = """
+        <div style="text-align: left;">
+            <h3>Prediction Results:</h3>
+            <ul style="list-style-type: none; padding-left: 0;">
+        """
+        for cls, prob in zip(preds, probs):
+            output_html += f'<li><strong>{cls}</strong>: {prob:.4f}</li>'
+
+        output_html += "</ul>"
+        output_html += f'<p><strong>Top Prediction:</strong> {top_label} ({top_confidence:.4f})</p>'
+        output_html += "</div>"
+
+        return output_html
     return '<a href="#" class="badge badge-warning">Warning</a>'
-
 
 @app.route('/test', methods=['GET'])
 def test():

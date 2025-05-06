@@ -61,6 +61,7 @@ def preprocess_image(img):
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
+
     return transform(img).unsqueeze(0)
 
 
@@ -75,13 +76,25 @@ def predict_image(request: ImageRequest):
         image = preprocess_image(image).to(device)
 
         # Run inference
+        # with torch.no_grad():
+        #     output = model(image)
+        #     probabilities = F.softmax(output, dim=1)  # Apply softmax to get probabilities
+        #     predicted_class = torch.argmax(probabilities, 1).item()
+        #     confidence = probabilities[0, predicted_class].item()  # Get the probability
+        #
+        # return PredictionResponse(predictions=[classes[predicted_class]], probabilities=[confidence])
         with torch.no_grad():
             output = model(image)
-            probabilities = F.softmax(output, dim=1)  # Apply softmax to get probabilities
-            predicted_class = torch.argmax(probabilities, 1).item()
-            confidence = probabilities[0, predicted_class].item()  # Get the probability
+            probabilities = F.softmax(output, dim=1).squeeze()  # Shape: (num_classes,)
+            prob_list = probabilities.tolist()
 
-        return PredictionResponse(prediction=[classes[predicted_class]], probability=[confidence])
+        # Return all class names and their probabilities
+        return PredictionResponse(
+            predictions=classes.tolist(),  # All class names
+            probabilities=prob_list  # Corresponding probabilities
+        )
+
+
 
     except Exception as e:
         return {"error": str(e)}
