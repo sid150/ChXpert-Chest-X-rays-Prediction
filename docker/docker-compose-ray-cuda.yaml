@@ -24,7 +24,7 @@ services:
       - RAY_PROMETHEUS_HOST=http://ray-head:9090
       - RAY_PROMETHEUS_NAME=Prometheus
       - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}     # for MinIO access
-      - AWS_SECRET_ACCESS_KEY= ${MINIO_ROOT_PASSWORD}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
       - AWS_ENDPOINT_URL=http://129.114.26.91:9000   #replace with floating ip of cpu instance
     user: root
 
