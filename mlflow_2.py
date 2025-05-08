@@ -176,7 +176,14 @@ def train_func(config):
     if int(os.environ.get("RANK", 0)) == 0:
         best_model_path = checkpoint_callback.best_model_path
         if os.path.exists(best_model_path):
-            mlflow.log_artifact(best_model_path, artifact_path="model")
+            # Load model and save full model (not just state_dict)
+            trained_model = LightningCheXpertModel.load_from_checkpoint(best_model_path, config=config)
+            torch.save(trained_model, "chexpert_full_model.pth")
+            mlflow.log_artifact("chexpert_full_model.pth", artifact_path="model")
+            
+            # Also log Lightning checkpoint as artifact
+            mlflow.log_artifact(best_model_path, artifact_path="checkpoints")
+
         mlflow.end_run()
 
 
