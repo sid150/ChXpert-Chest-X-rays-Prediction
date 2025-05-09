@@ -10,7 +10,7 @@ services:
 
   flask:
     build:
-      context: ../chexpertService       # needs to be changed
+      context: https://github.com/sid150/ChXpert-Chest-X-rays-Prediction.git#fastapi       
       dockerfile: DockerFile
     container_name: flask
     ports:
