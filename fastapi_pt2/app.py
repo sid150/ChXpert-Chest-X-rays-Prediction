@@ -11,6 +11,21 @@ import numpy as np
 import mlflow
 from mlflow.tracking import MlflowClient
 from prometheus_fastapi_instrumentator import Instrumentator
+from prometheus_client import Histogram, Counter
+
+# Histogram for prediction confidence
+confidence_histogram = Histogram(
+    "prediction_confidence",
+    "Model prediction confidence",
+    buckets=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+)
+
+# Count how often we predict each class
+class_counter = Counter(
+    "predicted_class_total",
+    "Count of predictions per class",
+    ['class_name']
+)
 
 # Change to environment variable later:
 mlflow.set_tracking_uri("http://129.114.26.91:8000/")
@@ -102,9 +117,15 @@ def predict_image(request: ImageRequest):
 
         with torch.no_grad():
             logits = model(image)
-            probabilities = torch.sigmoid(logits).squeeze()
+            probabilities = torch.sigmoid(logits).squeeze(0)
             # probabilities = F.softmax(output, dim=1).squeeze()  # Shape: (num_classes,)
-            prob_list = probabilities.tolist()
+        prob_list = probabilities.tolist()
+
+        # Log all confidence values
+        for i, prob in enumerate(probabilities):
+            confidence_histogram.observe(prob.item())
+            if prob.item() > 0.5:
+                class_counter.labels(class_name=classes[i]).inc()
 
         # Return all class names and their probabilities
         return PredictionResponse(
