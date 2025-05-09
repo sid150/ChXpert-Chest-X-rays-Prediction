@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 from pydantic import BaseModel, Field
 import base64
 import torch
@@ -23,7 +23,6 @@ runs = client.search_runs(experiment_ids=[experiment.experiment_id],
 best_run = runs[0]  # The first run is the best due to sorting
 best_run_id = best_run.info.run_id
 model_uri = f"runs:/{best_run_id}/model"
-
 
 app = FastAPI(
     title="CheXpert X-ray classification API",
@@ -85,7 +84,7 @@ def preprocess_image(img):
         transforms.Resize((image_size, image_size)),
         transforms.Grayscale(num_output_channels=3),
         transforms.ToTensor(),
-        transforms.Normalize([0.5]*3, [0.5]*3)
+        transforms.Normalize([0.5] * 3, [0.5] * 3)
     ])
 
     return transform(img).unsqueeze(0)
@@ -102,7 +101,7 @@ def predict_image(request: ImageRequest):
         image = preprocess_image(image).to(device)
 
         with torch.no_grad():
-            logits = model(image.unsqueeze(0))
+            logits = model(image)
             probabilities = torch.sigmoid(logits).squeeze()
             # probabilities = F.softmax(output, dim=1).squeeze()  # Shape: (num_classes,)
             prob_list = probabilities.tolist()
@@ -117,5 +116,6 @@ def predict_image(request: ImageRequest):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid base64 input")
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Inference error: {str(e)}")
+
 
 Instrumentator().instrument(app).expose(app)
