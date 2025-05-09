@@ -25,34 +25,6 @@ from pyarrow import fs
 
 import os
 
-mnt_path = "/mnt"
-directories = [d for d in os.listdir(mnt_path) if os.path.isdir(os.path.join(mnt_path, d))]
-
-print("Directories in /mnt:")
-for d in directories:
-    print(d)
-
-
-print("Current working directory:", os.getcwd())
-current_dir = os.getcwd()
-
-# List all entries in the current directory
-entries = os.listdir(current_dir)
-
-# Iterate over the entries and print only files
-for entry in entries:
-    full_path = os.path.join(current_dir, entry)
-    if os.path.isfile(full_path):
-        print(entry)
-
-
-s3_fs = fs.S3FileSystem(
-    endpoint_override="http://129.114.26.91:9000",
-    access_key="minioadmin",
-    secret_key="minioadmin123",
-    scheme="http"
-)
-
 csv_path = os.path.join(os.getcwd(), "filtered_chexpert_paths.csv")
 print(csv_path)
 torch.set_float32_matmul_precision('medium')
@@ -237,9 +209,6 @@ config = {
     "lr": 1e-4,
     "fine_tune_lr": 1e-6,
 }
-print(">> AWS_ACCESS_KEY_ID:", os.getenv("AWS_ACCESS_KEY_ID"))
-print(">> RAY_AWS_STORAGE_ENDPOINT:", os.getenv("RAY_AWS_STORAGE_ENDPOINT"))
-print(">> MLFLOW_TRACKING_URI:", os.getenv("MLFLOW_TRACKING_URI", "not set"))
 
 run_config = RunConfig(storage_path = "s3://ray",failure_config=FailureConfig(max_failures=2))
 scaling_config = ScalingConfig(num_workers=1, use_gpu=True, resources_per_worker={"GPU": 1, "CPU": 8})
