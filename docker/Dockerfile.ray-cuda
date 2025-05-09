@@ -1,0 +1,10 @@
+FROM rayproject/ray:2.42.1-gpu
+
+RUN pip install --no-cache-dir \
+    torch \
+    torchvision \
+    lightning \
+    numpy \
+    pandas \
+    scikit-learn \
+    mlflow
