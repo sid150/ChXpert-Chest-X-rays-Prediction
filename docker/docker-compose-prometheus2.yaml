@@ -2,7 +2,7 @@ name: eval_online
 services:
   fastapi_server:
     build:
-      context: ../fastapi_pt
+      context: ../fastapi_pt2
       dockerfile: Dockerfile
     container_name: fastapi_server
     ports:
