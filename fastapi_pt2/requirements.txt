@@ -21,6 +21,7 @@ fastapi
 uvicorn
 pillow
 prometheus-fastapi-instrumentator
+prometheus-client
 
 # CPU-only PyTorch (matching your updated version)
 --extra-index-url https://download.pytorch.org/whl/cpu
