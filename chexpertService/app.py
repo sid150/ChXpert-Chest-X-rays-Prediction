@@ -8,12 +8,14 @@ import base64
 app = Flask(__name__)
 
 os.makedirs(os.path.join(app.instance_path, 'uploads'), exist_ok=True)
-# FASTAPI_SERVER_URL = os.environ['FASTAPI_SERVER_URL']
-# print(FASTAPI_SERVER_URL)
+
 if 'FASTAPI_SERVER_URL' in os.environ:
     FASTAPI_SERVER_URL = os.environ['FASTAPI_SERVER_URL']  # New: FastAPI server URL
 else:
     FASTAPI_SERVER_URL = "http://127.0.0.1:8000"
+
+FASTAPI_SERVER_URL = os.environ['FASTAPI_SERVER_URL']
+print(FASTAPI_SERVER_URL)
 
 
 # New! for making requests to FastAPI
@@ -88,6 +90,7 @@ def upload():
 
         return output_html
     return '<a href="#" class="badge badge-warning">Warning</a>'
+
 
 @app.route('/test', methods=['GET'])
 def test():
