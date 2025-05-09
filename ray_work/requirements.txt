@@ -1,0 +1,7 @@
+torch
+torchvision
+lightning
+numpy
+pandas
+scikit-learn
+mlflow
