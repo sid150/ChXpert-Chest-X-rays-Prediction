@@ -54,4 +54,4 @@ services:
         source: /mnt/object
         target: /mnt/dataset
         read_only: true
-    command: start-notebook.sh --NotebookApp.token=''
+    command: bash -c "pip install alibi-detect numpy requests matplotlib && start-notebook.sh"
