@@ -6,7 +6,7 @@ import subprocess
 
 RCLONE_REMOTE = "chi_tacc:object-persist-project29/production"
 LOCAL_SYNC_DIR = "chi_production_data"
-INFERENCE_URL = "http://fastapi:8000/predict"
+INFERENCE_URL = "http://fastapi_server:8000/predict"
 DELAY_BETWEEN_IMAGES = 3  # seconds
 
 def sync_data_from_chameleon():
