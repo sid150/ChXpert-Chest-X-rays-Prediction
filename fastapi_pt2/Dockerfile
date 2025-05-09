@@ -1,5 +1,5 @@
 # Use an official Python runtime as a parent image
-FROM python:3.11-slim
+FROM python:3.9-slim
 
 # Set the working directory
 WORKDIR /app
@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Ensure model file is available inside the container
-COPY demoModel.pt /app/
+# COPY demoModel.pt /app/
 
 # Expose FastAPI port
 EXPOSE 8000
