@@ -39,8 +39,8 @@ services:
 
   jupyter:
     build:
-      context: ./
-      dockerfile: Dockerfile.jupyter_prometheus2
+      context: ../jupyterServing
+      dockerfile: Dockerfile
     container_name: jupyter
     ports:
       - "8888:8888"
