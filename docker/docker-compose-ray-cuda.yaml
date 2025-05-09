@@ -81,26 +81,26 @@ services:
     depends_on:
       - ray-head
 
-  # ray-worker-2:
-  #   image: rayproject/ray:2.42.1-gpu
-  #   container_name: ray-worker-1
-  #   command: ["ray", "start", "--address=ray-head:6379", "--num-cpus=32", "--num-gpus=1", "--block"]
-  #   deploy:
-  #     resources:
-  #       reservations:
-  #         devices:
-  #           - driver: "nvidia"
-  #             capabilities: ["gpu"]
-  #             device_ids: ["1"]
-  #   environment:
-  #     - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}     # for MinIO access
-  #     - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
-  #     - AWS_ENDPOINT_URL=http://129.114.26.91:9000  #replace with floating ip of cpu instance
-  #   shm_size: '12g'
-  #   volumes:
-  #     - xray:/mnt
-  #   depends_on:
-  #     - ray-head
+  ray-worker-2:
+    image: rayproject/ray:2.42.1-gpu
+    container_name: ray-worker-1
+    command: ["ray", "start", "--address=ray-head:6379", "--num-cpus=32", "--num-gpus=1", "--block"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: "nvidia"
+              capabilities: ["gpu"]
+              device_ids: ["1"]
+    environment:
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}     # for MinIO access
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+      - AWS_ENDPOINT_URL=http://129.114.26.91:9000  #replace with floating ip of cpu instance
+    shm_size: '12g'
+    volumes:
+      - /mnt/object:/mnt
+    depends_on:
+      - ray-head
 
 volumes:
   grafana_storage:
