@@ -56,6 +56,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 #     model.to(device)
 #     model.eval()
 model = mlflow.pytorch.load_model(model_uri)
+model.to(device)
+model.eval()
 
 # Define class labels
 classes = np.array([
@@ -98,14 +100,6 @@ def predict_image(request: ImageRequest):
         # Preprocess the image
         image = preprocess_image(image).to(device)
 
-        # Run inference
-        # with torch.no_grad():
-        #     output = model(image)
-        #     probabilities = F.softmax(output, dim=1)  # Apply softmax to get probabilities
-        #     predicted_class = torch.argmax(probabilities, 1).item()
-        #     confidence = probabilities[0, predicted_class].item()  # Get the probability
-        #
-        # return PredictionResponse(predictions=[classes[predicted_class]], probabilities=[confidence])
         with torch.no_grad():
             logits = model(image.unsqueeze(0))
             probabilities = torch.sigmoid(logits).squeeze()
