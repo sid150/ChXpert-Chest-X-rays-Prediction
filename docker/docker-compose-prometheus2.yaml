@@ -2,7 +2,7 @@ name: eval_online
 services:
   fastapi_server:
     build:
-      context: ../fastapi_pt2
+      context: ../fastapi_pt
       dockerfile: Dockerfile
     container_name: fastapi_server
     ports:
@@ -39,8 +39,8 @@ services:
 
   jupyter:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ./
+      dockerfile: Dockerfile.jupyter_prometheus2
     container_name: jupyter
     ports:
       - "8888:8888"
