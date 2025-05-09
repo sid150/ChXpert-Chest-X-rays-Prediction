@@ -241,7 +241,7 @@ print(">> AWS_ACCESS_KEY_ID:", os.getenv("AWS_ACCESS_KEY_ID"))
 print(">> RAY_AWS_STORAGE_ENDPOINT:", os.getenv("RAY_AWS_STORAGE_ENDPOINT"))
 print(">> MLFLOW_TRACKING_URI:", os.getenv("MLFLOW_TRACKING_URI", "not set"))
 
-run_config = RunConfig(failure_config=FailureConfig(max_failures=2))
+run_config = RunConfig(storage_path = "s3://ray",failure_config=FailureConfig(max_failures=2))
 scaling_config = ScalingConfig(num_workers=1, use_gpu=True, resources_per_worker={"GPU": 1, "CPU": 8})
 
 trainer = TorchTrainer(
