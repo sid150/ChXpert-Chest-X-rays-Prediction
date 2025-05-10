@@ -1,5 +1,4 @@
 version: '3.8'
-name: persist_block
 
 services:
   minio:
@@ -26,8 +25,7 @@ services:
   minio-create-bucket:
     image: minio/mc
     depends_on:
-      minio:
-        condition: service_healthy
+      - minio
     entrypoint: >
       /bin/sh -c "
       mc alias set minio http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} &&
@@ -42,7 +40,8 @@ services:
         echo 'Bucket ray created';
       else
         echo 'Bucket ray already exists';
-      fi"
+      fi
+      "
 
   postgres:
     image: postgres:latest
@@ -70,8 +69,8 @@ services:
       MLFLOW_S3_ENDPOINT_URL: http://minio:9000
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      AWS_S3_MULTIPART_THRESHOLD:  "52428800"   # 50 MB
-      AWS_S3_MULTIPART_CHUNKSIZE:    "10485760"   # 10 MB
+      AWS_S3_MULTIPART_THRESHOLD: "52428800"   # 50 MB
+      AWS_S3_MULTIPART_CHUNKSIZE:   "10485760" # 10 MB
     ports:
       - "8000:8000"
     command: >
