@@ -18,7 +18,7 @@ FASTAPI_SERVER_URL = os.environ['FASTAPI_SERVER_URL']
 print(FASTAPI_SERVER_URL)
 
 
-# New! for making requests to FastAPI
+# For making requests to FastAPI
 def request_fastapi(image_path):
     try:
         with open(image_path, 'rb') as f:
@@ -32,10 +32,6 @@ def request_fastapi(image_path):
 
         result = response.json()
         print("result: ", result)
-        # predicted_class = result.get("prediction")
-        # probability = result.get("probability")
-        # predicted_class = result.get("predictions", [None])[0]
-        # probability = result.get("probabilities", [None])[0]
 
         # return predicted_class, probability
         predicted_classes = result.get("predictions", [])
@@ -65,11 +61,8 @@ def upload():
         print("Uploaded image path:", img_path)
         print("FastAPI returned:", preds, probs)
 
-    #     if preds:
-    #         return f'<button type="button" class="btn btn-info btn-sm">{preds}</button>'
-    #
-    # return '<a href="#" class="badge badge-warning">Warning</a>'
     if preds and probs:
+        threshold = 0.5
         # Find the top prediction
         top_idx = probs.index(max(probs))
         top_label = preds[top_idx]
@@ -81,14 +74,19 @@ def upload():
             <h3>Prediction Results:</h3>
             <ul style="list-style-type: none; padding-left: 0;">
         """
+        # for cls, prob in zip(preds, probs):
+        #     output_html += f'<li><strong>{cls}</strong>: {prob:.4f}</li>'
+        #
+        # output_html += "</ul>"
+        # output_html += f'<p><strong>Top Prediction:</strong> {top_label} ({top_confidence:.4f})</p>'
+        # output_html += "</div>"
         for cls, prob in zip(preds, probs):
-            output_html += f'<li><strong>{cls}</strong>: {prob:.4f}</li>'
-
-        output_html += "</ul>"
-        output_html += f'<p><strong>Top Prediction:</strong> {top_label} ({top_confidence:.4f})</p>'
-        output_html += "</div>"
+            present = "Present" if prob > threshold else "Absent"
+            output_html += f'<li><strong>{cls}</strong>: {prob:.4f} — {present}</li>'
+        output_html += "</ul></div>"
 
         return output_html
+
     return '<a href="#" class="badge badge-warning">Warning</a>'
 
 
