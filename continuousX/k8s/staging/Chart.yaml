@@ -1,0 +1,4 @@
+apiVersion: v2
+name: chexpert-staging
+version: 1.0.0
+description: CheXpert Staging Deployment

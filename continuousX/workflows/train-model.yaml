@@ -1,0 +1,107 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: train-model
+spec:
+  entrypoint: training-and-build
+  arguments:
+    parameters:
+    - name: endpoint-ip
+
+  templates:
+  - name: training-and-build
+    steps:
+      - - name: trigger-training-endpoint
+          template: call-endpoint
+          arguments:
+            parameters:
+            - name: endpoint-ip
+              value: "{{workflow.parameters.endpoint-ip}}"
+      - - name: build-container
+          template: trigger-build
+          arguments:
+            parameters:
+            - name: model-version
+              value: "{{steps.trigger-training-endpoint.outputs.result}}"
+          when: "{{steps.trigger-training-endpoint.outputs.result}} != ''"
+
+  - name: call-endpoint
+    inputs:
+      parameters:
+      - name: endpoint-ip
+    script:
+      image: alpine:3.18
+      command: [sh]
+      source: |
+
+        MAX_RETRIES=5
+        RETRY_DELAY=3
+        i=1
+        INSTALL_SUCCESS=0
+
+        set +e  # allow manual error handling
+
+        # Retry installation
+        while [  -le  ]; do
+          echo "[INFO] Attempt  to install curl and jq..." >&2
+          apk update > /dev/null 2>&1
+          apk add --no-cache curl jq > /dev/null 2>&1
+          STATUS=0
+          if [  -eq 0 ]; then
+            echo "[INFO] Packages installed successfully." >&2
+            INSTALL_SUCCESS=1
+            break
+          fi
+          echo "[WARN] apk add failed (exit ). Retrying in  seconds..." >&2
+          sleep 
+          i=1
+        done
+
+        set -e  # return to fail-fast mode
+
+        if [  -ne 1 ]; then
+          echo "[ERROR] Failed to install curl and jq after  attempts." >&2
+          exit 1
+        fi
+
+        # Trigger model training
+        echo "[INFO] Triggering model training..." >&2
+        RESPONSE=
+        CURL_EXIT_CODE=3
+
+        echo "[INFO] Training endpoint response was: " >&2
+
+
+        if [  -ne 0 ]; then
+          echo "[ERROR] curl failed with code " >&2
+          exit 
+        fi
+
+        # Extract model version
+        VERSION=
+
+        if [ -z "" ]; then
+          echo "[WARN] 'new_model_version' not found in response." >&2
+          exit 1
+        fi
+
+        echo -n ""
+
+  - name: trigger-build
+    inputs:
+      parameters:
+      - name: model-version
+    resource:
+      action: create
+      manifest: |
+        apiVersion: argoproj.io/v1alpha1
+        kind: Workflow
+        metadata:
+          generateName: build-container-image-
+        spec:
+          workflowTemplateRef:
+            name: build-container-image
+          arguments:
+            parameters:
+            - name: model-version
+              value: "{{inputs.parameters.model-version}}"

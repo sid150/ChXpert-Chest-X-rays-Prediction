@@ -1,0 +1,4 @@
+apiVersion: v2
+name: chexpert-app
+description: Canary deployment of CheXpert Chest X-ray Prediction App
+version: 0.1.0

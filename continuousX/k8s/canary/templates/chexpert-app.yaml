@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chexpert
+  namespace: chexpert-staging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chexpert
+  template:
+    metadata:
+      labels:
+        app: chexpert
+    spec:
+      containers:
+      - name: chexpert
+        image: registry.kube-system.svc.cluster.local:5000/chexpert:staging-1.0.0
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+        - mountPath: /app/model
+          name: model-vol
+      volumes:
+      - name: model-vol
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chexpert
+  namespace: chexpert-staging
+spec:
+  selector:
+    app: chexpert
+  ports:
+  - port: 8081
+    targetPort: 8080
+  type: ClusterIP
+  externalIPs:
+    - {{ .Values.externalIP }}

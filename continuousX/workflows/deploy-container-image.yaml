@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: deploy-container-image
+spec:
+  entrypoint: deploy
+  arguments:
+    parameters:
+    - name: environment
+    - name: model-version
+
+  templates:
+  - name: deploy
+    inputs:
+      parameters:
+      - name: environment
+      - name: model-version
+    container:
+      image: argoproj/argocd:latest
+      command: [sh, -c]
+      args:
+        - |
+          echo "Deploying model {{inputs.parameters.model-version}} to {{inputs.parameters.environment}}..."
+          tag="{{inputs.parameters.environment}}-1.0.{{inputs.parameters.model-version}}"
+          app_name="chexpert-{{inputs.parameters.environment}}"
+
+          argocd login argocd-server.argocd.svc.cluster.local             --username admin             --password ""             --insecure
+
+          argocd app set "" --helm-set-string image.tag=
+          argocd app sync ""
+      env:
+        - name: ARGOCD_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: argocd-initial-admin-secret
+              key: password

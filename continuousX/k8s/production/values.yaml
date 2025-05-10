@@ -1,0 +1,19 @@
+# values.yaml for CheXpert Production
+
+replicaCount: 3
+
+image:
+  repository: registry.kube-system.svc.cluster.local:5000/chexpert
+  tag: production-1.0.0
+
+service:
+  port: 8080
+  externalIP: ""   # Placeholder for production external IP
+
+resources:
+  limits:
+    cpu: "1"
+    memory: "512Mi"
+  requests:
+    cpu: "500m"
+    memory: "256Mi"

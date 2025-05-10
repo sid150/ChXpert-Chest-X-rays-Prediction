@@ -1,0 +1,38 @@
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chexpert-app
+  namespace: chexpert-production
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: chexpert-app
+  template:
+    metadata:
+      labels:
+        app: chexpert-app
+    spec:
+      containers:
+        - name: chexpert-app
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          ports:
+            - containerPort: 8000
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: chexpert-app
+  namespace: chexpert-production
+spec:
+  selector:
+    app: chexpert-app
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: 8000
+  externalIPs:
+    - {{ .Values.service.externalIP }}

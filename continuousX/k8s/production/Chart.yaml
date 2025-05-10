@@ -1,0 +1,4 @@
+apiVersion: v2
+name: chexpert-production
+version: 1.0.0
+description: CheXpert Production Deployment
