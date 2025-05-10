@@ -1,4 +1,6 @@
+version: '3.8'
 name: persist_block
+
 services:
   minio:
     image: minio/minio
@@ -10,8 +12,8 @@ services:
       - "9000:9000"
       - "9001:9001"
     environment:
-      MINIO_ROOT_USER: "your-access-key"
-      MINIO_ROOT_PASSWORD: "your-secret-key"
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     healthcheck:
       test: timeout 5s bash -c ':> /dev/tcp/127.0.0.1/9000' || exit 1
       interval: 1s
@@ -21,21 +23,20 @@ services:
     volumes:
       - /mnt/block/minio_data:/data
 
-  # Create both 'mlflow-artifacts' and 'ray' buckets
-  minio-create-buckets:
+  minio-create-bucket:
     image: minio/mc
     depends_on:
       minio:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-      mc alias set minio http://minio:9000 your-access-key your-secret-key &&
+      mc alias set minio http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} &&
       if ! mc ls minio/mlflow-artifacts; then
         mc mb minio/mlflow-artifacts &&
         echo 'Bucket mlflow-artifacts created';
       else
         echo 'Bucket mlflow-artifacts already exists';
-      fi &&
+      fi;
       if ! mc ls minio/ray; then
         mc mb minio/ray &&
         echo 'Bucket ray created';
@@ -43,15 +44,14 @@ services:
         echo 'Bucket ray already exists';
       fi"
 
-
   postgres:
     image: postgres:latest
     container_name: postgres
     restart: always
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: mlflowdb
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
@@ -68,31 +68,21 @@ services:
     environment:
       MLFLOW_TRACKING_URI: http://0.0.0.0:8000
       MLFLOW_S3_ENDPOINT_URL: http://minio:9000
-      AWS_ACCESS_KEY_ID: "your-access-key"
-      AWS_SECRET_ACCESS_KEY: "your-secret-key"
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_S3_MULTIPART_THRESHOLD:  "52428800"   # 50 MB
+      AWS_S3_MULTIPART_CHUNKSIZE:    "10485760"   # 10 MB
     ports:
       - "8000:8000"
     command: >
-      /bin/sh -c "pip install psycopg2-binary boto3 &&
-      mlflow server --backend-store-uri postgresql://user:password@postgres/mlflowdb 
-      --artifacts-destination s3://mlflow-artifacts/ --serve-artifacts --host 0.0.0.0 --port 8000"
-
-  jupyter:
-    image: quay.io/jupyter/pytorch-notebook:pytorch-2.5.1
-    container_name: jupyter
-    ports:
-      - "8888:8888"
-    shm_size: 8g
-    environment:
-      - MLFLOW_TRACKING_URI=http://${HOST_IP}:8000/
-      - XRAY_DATA_DIR=/mnt/object
-    volumes:
-      - /home/cc/workspace:/home/jovyan/work/
-      - type: bind
-        source: /mnt/object
-        target: /mnt/dataset
-        read_only: true
-    command: >
-      bash -c "python3 -m pip install mlflow && start-notebook.sh"
-
-
+      /bin/sh -c "
+      pip install psycopg2-binary boto3 &&
+      mlflow server \
+        --backend-store-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB} \
+        --default-artifact-root s3://mlflow-artifacts/ \
+        --no-serve-artifacts \
+        --host 0.0.0.0 --port 8000 \
+        --gunicorn-opts \"\
+          --worker-class gthread \
+          --workers 4 --threads 8 \
+          --timeout 300\""
