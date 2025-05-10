@@ -142,7 +142,7 @@ def train_func(config):
     callbacks = [
         EarlyStopping(monitor='val_loss', patience=config.get('patience', 5), mode='min'),
         BackboneFinetuning(
-            unfreeze_backbone_at_epoch=config.get('initial_epochs', 1),
+            unfreeze_bacQkbone_at_epoch=config.get('initial_epochs', 1),
             backbone_initial_lr=config.get('fine_tune_lr', 1e-5),
             should_align=True
         ),
@@ -181,16 +181,17 @@ def train_func(config):
         mlflow.end_run()
 
 config = {
-    'initial_epochs': 1,
-    'total_epochs': 2,
-    'patience': 3,
+    'initial_epochs': 2,
+    'data_percent_used': 10,
+    'total_epochs': 5,
+    'patience': 1,
     'batch_size': 32,
     'lr': 1e-4,
     'fine_tune_lr': 1e-5,
     'use_lora': False,
     'precision': '32',
     'accumulate_grad_batches': 1,
-    'vit_model': 'google/vit-huge-patch14-224',
+    'vit_model': 'google/vit-large-patch16-224-in21k',
     'mlflow_uri': 'http://129.114.26.91:8000',
     'mlflow_experiment': 'vit-chexpert',
     'traing_strat': 'DDPStrategy'
