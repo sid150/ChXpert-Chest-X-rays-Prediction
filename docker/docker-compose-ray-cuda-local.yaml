@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.ray-cuda
-    image: rayproject-custom:2.42.1
+    image: rayproject/ray:2.42.1
     container_name: ray-head
     command: >
       /bin/sh -c "
@@ -65,7 +65,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.ray-cuda
-    image: rayproject-custom:2.42.1-gpu
+    image: rayproject/ray:2.42.1-gpu
     container_name: ray-worker-0
     command: ["ray", "start", "--address=ray-head:6379", "--num-cpus=32", "--num-gpus=1", "--block"]
     deploy:
@@ -89,7 +89,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.ray-cuda
-    image: rayproject-custom:2.42.1-gpu
+    image: rayproject/ray:2.42.1-gpu
     container_name: ray-worker-1
     command: ["ray", "start", "--address=ray-head:6379", "--num-cpus=32", "--num-gpus=1", "--block"]
     deploy:
