@@ -11,7 +11,8 @@ from sklearn.metrics import roc_auc_score, precision_recall_fscore_support, accu
 import lightning as L
 from lightning import Trainer
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, BackboneFinetuning
-
+import pynvml
+from lightning.pytorch.callbacks import Callback
 import mlflow
 import ray.train.torch
 import ray.train.lightning
@@ -62,7 +63,7 @@ class CheXpertDataset(torch.utils.data.Dataset):
 def get_dataloaders(csv_path, batch_size):
     ds = CheXpertDataset(csv_path=csv_path)
     n = len(ds)
-    subset = int(0.1 * n)
+    subset = int(0.05 * n)
     sv = torch.utils.data.Subset(ds, list(range(subset)))
     val_size = int(0.2 * subset)
     train_size = subset - val_size
@@ -135,19 +136,45 @@ def train_func(config):
 
         def configure_optimizers(self):
             return optim.Adam(self.model.parameters(), lr=self.lr)
+            
+    class MLflowGPUMetricsCallback(Callback):
+        def __init__(self, gpu_indices=None, log_every_n_steps=50):
+            super().__init__()
+            pynvml.nvmlInit()
+            # by default log all visible GPUs
+            self.gpu_indices = gpu_indices or list(range(pynvml.nvmlDeviceGetCount()))
+            self.log_every_n_steps = log_every_n_steps
+    
+        def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
+            # only log on rank 0 / driver
+            if trainer.global_rank != 0:
+                return
+            step = trainer.global_step
+            if step % self.log_every_n_steps != 0:
+                return
+    
+            for idx in self.gpu_indices:
+                handle = pynvml.nvmlDeviceGetHandleByIndex(idx)
+                util  = pynvml.nvmlDeviceGetUtilizationRates(handle).gpu
+                mem   = pynvml.nvmlDeviceGetMemoryInfo(handle).used // (1024**2)
+                # log two separate metrics per GPU
+                mlflow.log_metric(f"gpu{idx}_util_pct", util, step=step)
+                mlflow.log_metric(f"gpu{idx}_mem_mb",   mem,  step=step)
 
+                
     train_loader, val_loader = get_dataloaders(tsv_path, batch_size=config['batch_size'])
     model = VitCheXpert(config)
 
     callbacks = [
         EarlyStopping(monitor='val_loss', patience=config.get('patience', 5), mode='min'),
         BackboneFinetuning(
-            unfreeze_bacQkbone_at_epoch=config.get('initial_epochs', 1),
+            unfreeze_backbone_at_epoch=config.get('initial_epochs', 1),
             backbone_initial_lr=config.get('fine_tune_lr', 1e-5),
             should_align=True
         ),
         RayTrainReportCallback(),
-        ModelCheckpoint(dirpath='checkpoints/', filename='vit-chexpert', monitor='val_loss', mode='min', save_top_k=1)
+        ModelCheckpoint(dirpath='checkpoints/', filename='vit-chexpert', monitor='val_loss', mode='min', save_top_k=1),
+        MLflowGPUMetricsCallback(log_every_n_steps=20)
     ]
 
     trainer = Trainer(
@@ -182,8 +209,8 @@ def train_func(config):
 
 config = {
     'initial_epochs': 2,
-    'data_percent_used': 10,
-    'total_epochs': 5,
+    'data_percent_used': 1,
+    'total_epochs': 3,
     'patience': 1,
     'batch_size': 32,
     'lr': 1e-4,
