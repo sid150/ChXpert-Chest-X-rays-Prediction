@@ -7,4 +7,5 @@ RUN pip install --no-cache-dir \
     numpy \
     pandas \
     scikit-learn \
-    mlflow
+    mlflow \
+    peft
