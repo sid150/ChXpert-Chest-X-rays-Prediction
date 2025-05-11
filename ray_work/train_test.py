@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset, random_split
 from PIL import Image
 from sklearn.metrics import roc_auc_score, precision_recall_fscore_support, accuracy_score
 
@@ -60,17 +60,42 @@ class CheXpertDataset(torch.utils.data.Dataset):
         return x, y
 
 # === Dataloaders ===
-def get_dataloaders(csv_path, batch_size):
+def get_dataloaders(csv_path, batch_size, seed=42):
     ds = CheXpertDataset(csv_path=csv_path)
-    n = len(ds)
-    subset = int(0.5 * n)
-    sv = torch.utils.data.Subset(ds, list(range(subset)))
-    val_size = int(0.2 * subset)
-    train_size = subset - val_size
-    train_ds, val_ds = torch.utils.data.random_split(sv, [train_size, val_size])
-    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True)
-    val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True)
-    return train_loader, val_loader
+    n  = len(ds)
+
+    # 1) take 20% of the full dataset
+    subset_size = int(0.2 * n)
+    torch.manual_seed(seed)
+    full_indices = torch.randperm(n)[:subset_size].tolist()
+    subset_ds = Subset(ds, full_indices)
+
+    # 2) split that 20% into 80/10/10
+    train_len = int(0.8 * subset_size)
+    val_len   = int(0.1 * subset_size)
+    test_len  = subset_size - train_len - val_len
+
+    train_ds, val_ds, test_ds = random_split(
+        subset_ds,
+        [train_len, val_len, test_len],
+        generator=torch.Generator().manual_seed(seed)
+    )
+
+    # 3) DataLoaders
+    train_loader = DataLoader(
+        train_ds, batch_size=batch_size, shuffle=True,
+        num_workers=8, pin_memory=True
+    )
+    val_loader = DataLoader(
+        val_ds, batch_size=batch_size, shuffle=False,
+        num_workers=8, pin_memory=True
+    )
+    test_loader = DataLoader(
+        test_ds, batch_size=batch_size, shuffle=False,
+        num_workers=8, pin_memory=True
+    )
+
+    return train_loader, val_loader, test_loader
 
 # === Training function ===
 def train_func(config):
@@ -78,62 +103,167 @@ def train_func(config):
         def __init__(self, cfg, num_classes=14):
             super().__init__()
             self.save_hyperparameters()
+    
+            # === Model & (optional) LoRA ===
             model_name = cfg.get("vit_model", "google/vit-base-patch16-224-in21k")
-            self.model = ViTForImageClassification.from_pretrained(model_name, num_labels=num_classes)
-
+            self.model = ViTForImageClassification.from_pretrained(
+                model_name, num_labels=num_classes
+            )
+    
             if cfg.get("use_lora", False):
                 lora_cfg = LoraConfig(
                     r=8,
                     lora_alpha=32,
-                    target_modules=["query", "value", "classifier"],  # include classification head
+                    target_modules=["query", "value", "classifier"],
                     lora_dropout=0.05,
                     bias="none"
                 )
                 self.model = get_peft_model(self.model, lora_cfg)
-
+    
+            # === Loss & LR ===
             self.criterion = nn.BCEWithLogitsLoss()
             self.lr = cfg["lr"]
-
+    
+            # Buffers for test‐time aggregation
+            self._test_true  = []
+            self._test_probs = []
+            self._test_preds = []
+    
         @property
         def backbone(self):
-            # BackboneFinetuning will freeze/unfreeze this module
+            # for BackboneFinetuning callback
             return self.model.vit
-
+    
         def forward(self, x):
             return self.model(pixel_values=x).logits
-
+    
         def training_step(self, batch, batch_idx):
             x, y = batch
             logits = self(x)
-            mask = (y == 0.0) | (y == 1.0)
-            loss = self.criterion(logits[mask], y[mask])
+            mask   = (y == 0.0) | (y == 1.0)
+            loss   = self.criterion(logits[mask], y[mask])
             self.log("train_loss", loss, sync_dist=True)
             return loss
-
+    
         def validation_step(self, batch, batch_idx):
-            x, y = batch
-            logits = self(x)
-            probs = torch.sigmoid(logits)
-            mask = (y == 0.0) | (y == 1.0)
-            y_true = y[mask].cpu().numpy()
-            y_pred = (probs[mask] > 0.5).cpu().numpy()
+            x, y    = batch
+            logits  = self(x)
+            probs   = torch.sigmoid(logits)
+            mask    = (y == 0.0) | (y == 1.0)
+    
+            # Flattened metrics
+            y_true  = y[mask].cpu().numpy()
+            y_pred  = (probs[mask] > 0.5).cpu().numpy()
+    
             loss = self.criterion(logits[mask], y[mask])
-            prec, rec, f1, _ = precision_recall_fscore_support(y_true, y_pred, average='macro', zero_division=0)
+    
+            prec, rec, f1, _ = precision_recall_fscore_support(
+                y_true, y_pred, average='macro', zero_division=0
+            )
             acc = accuracy_score(y_true, y_pred)
             try:
-                auroc = roc_auc_score(y_true, probs[mask].cpu().numpy(), average='macro')
-            except:
+                auroc = roc_auc_score(
+                    y_true, probs[mask].cpu().numpy(), average='macro'
+                )
+            except ValueError:
                 auroc = 0.0
+    
             self.log_dict({
-                'val_loss': loss,
+                'val_loss':     loss,
                 'val_precision': prec,
-                'val_recall': rec,
-                'val_f1': f1,
-                'val_accuracy': acc,
-                'val_auroc': auroc
+                'val_recall':    rec,
+                'val_f1':        f1,
+                'val_accuracy':  acc,
+                'val_auroc':     auroc
             }, sync_dist=True)
+    
             return loss
-
+    
+        def test_step(self, batch, batch_idx):
+            x, y    = batch
+            logits  = self(x)
+            probs   = torch.sigmoid(logits)
+    
+            # store for epoch‐end aggregation
+            self._test_true.append(y.detach().cpu())
+            self._test_probs.append(probs.detach().cpu())
+            self._test_preds.append((probs > 0.5).detach().cpu().float())
+    
+            return
+    
+        def test_epoch_end(self, outputs):
+            # concatenate all batches
+            true  = torch.cat(self._test_true, dim=0).numpy()   # shape (N, C)
+            probs = torch.cat(self._test_probs, dim=0).numpy()
+            preds = torch.cat(self._test_preds, dim=0).numpy()
+    
+            # mask uncertain
+            mask = (true == 0.0) | (true == 1.0)
+            true_m   = true[mask]
+            preds_m  = preds[mask]
+            probs_m  = probs[mask]
+    
+            # 1) Label-based (micro) accuracy
+            label_acc = accuracy_score(true_m, preds_m)
+            self.log("test_label_accuracy", label_acc)
+    
+            # 2) Sample-based accuracy (all labels match per image)
+            sample_acc = (preds == true).all(axis=1).mean()
+            self.log("test_sample_accuracy", sample_acc)
+    
+            # 3) Per-class & macro metrics
+            per_auc, per_prec, per_rec, per_f1 = [], [], [], []
+    
+            for c in range(true.shape[1]):
+                idx = mask[:, c]
+                if idx.sum() == 0:
+                    per_auc.append(np.nan)
+                    per_prec.append(np.nan)
+                    per_rec.append(np.nan)
+                    per_f1.append(np.nan)
+                    continue
+    
+                y_t = true[idx, c]
+                y_p = preds[idx, c]
+                y_s = probs[idx, c]
+    
+                # AUC
+                try:
+                    auc = roc_auc_score(y_t, y_s)
+                except ValueError:
+                    auc = np.nan
+                per_auc.append(auc)
+    
+                # P/R/F1
+                p, r, f1, _ = precision_recall_fscore_support(
+                    y_t, y_p, average="binary", zero_division=0
+                )
+                per_prec.append(p)
+                per_rec.append(r)
+                per_f1.append(f1)
+    
+                # log per-class if desired
+                self.log(f"test_auc_class_{c}",  auc)
+                self.log(f"test_prec_class_{c}", p)
+                self.log(f"test_rec_class_{c}",  r)
+                self.log(f"test_f1_class_{c}",   f1)
+    
+            # Macro-averages
+            macro_auc  = np.nanmean(per_auc)
+            macro_prec = np.nanmean(per_prec)
+            macro_rec  = np.nanmean(per_rec)
+            macro_f1   = np.nanmean(per_f1)
+    
+            self.log("test_auc_macro",      macro_auc)
+            self.log("test_precision_macro", macro_prec)
+            self.log("test_recall_macro",    macro_rec)
+            self.log("test_f1_macro",        macro_f1)
+    
+            # clear buffers
+            self._test_true.clear()
+            self._test_probs.clear()
+            self._test_preds.clear()
+    
         def configure_optimizers(self):
             return optim.Adam(self.model.parameters(), lr=self.lr)
             
@@ -162,7 +292,7 @@ def train_func(config):
                 mlflow.log_metric(f"gpu{idx}_mem_mb",   mem,  step=step)
 
                 
-    train_loader, val_loader = get_dataloaders(tsv_path, batch_size=config['batch_size'])
+    train_loader, val_loader, test_loader = get_dataloaders(tsv_path, batch_size=config['batch_size'])
     model = VitCheXpert(config)
 
     callbacks = [
@@ -203,7 +333,9 @@ def train_func(config):
             trainer.fit(model, train_loader, val_loader, ckpt_path=os.path.join(ckpt_dir, 'checkpoint.pt'))
     else:
         trainer.fit(model, train_loader, val_loader)
-
+        
+    trainer.test(model, test_loader)
+    
     if trainer.global_rank == 0:
         prof_summary = trainer.profiler.summary()
         prof_path = "profiler_summary.json"
