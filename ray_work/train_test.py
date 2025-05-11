@@ -65,7 +65,7 @@ def get_dataloaders(csv_path, batch_size, seed=42):
     n  = len(ds)
 
     # 1) take 20% of the full dataset
-    subset_size = int(0.05 * n)
+    subset_size = int(0.3 * n)
     torch.manual_seed(seed)
     full_indices = torch.randperm(n)[:subset_size].tolist()
     subset_ds = Subset(ds, full_indices)
@@ -345,14 +345,14 @@ def train_func(config):
         mlflow.end_run()
 
 config = {
-    'initial_epochs': 0,
-    'data_percent_used': 1,
-    'total_epochs': 1,
+    'initial_epochs': 1,
+    'data_percent_used': 30,
+    'total_epochs': 2,
     'patience': 1,
-    'batch_size': 32,
+    'batch_size': 64,
     'lr': 1e-4,
     'fine_tune_lr': 1e-5,
-    'use_lora': False,
+    'use_lora': True,
     'precision': '32',
     'accumulate_grad_batches': 1,
     'vit_model': 'google/vit-large-patch16-224-in21k',

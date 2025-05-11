@@ -23,15 +23,17 @@ from peft import LoraConfig, get_peft_model
 from transformers import ViTForImageClassification
 from ray import train
 import json
+from mlflow.tracking import MlflowClient
 from torchvision import transforms
+import requests
 # from lightning.pytorch.profiler import SimpleProfiler  # or AdvancedProfiler
 
 # from pytorch_lightning.profiler import SimpleProfiler, AdvancedProfiler
 # profiler = SimpleProfiler()
-
+os.environ["MLFLOW_TRACKING_URI"] = "http://129.114.26.91:8000"
 # Path to your CSV
 tsv_path = os.path.join(os.getcwd(), "filtered_chexpert_paths.csv")
-
+mlflow.set_tracking_uri("http://129.114.26.91:8000")
 # === Dataset ===
 class CheXpertDataset(torch.utils.data.Dataset):
     def __init__(self, csv_path, image_size=224):
@@ -65,7 +67,7 @@ def get_dataloaders(csv_path, batch_size, seed=42):
     n  = len(ds)
 
     # 1) take the last 20% of the full dataset
-    start_idx   = int(0.8 * n)
+    start_idx   = int(0.09 * n)
     subset_indices = list(range(start_idx, n))
     subset_ds   = Subset(ds, subset_indices)
     subset_size = len(subset_indices)
@@ -104,30 +106,63 @@ def train_func(config):
         def __init__(self, cfg, num_classes=14):
             super().__init__()
             self.save_hyperparameters()
+    
+            model_name        = cfg.get("vit_model", "google/vit-base-patch16-224-in21k")
+            mlflow_uri        = cfg["mlflow_uri"]
+            mlflow_experiment = cfg["mlflow_experiment"]
+            os.environ["MLFLOW_TRACKING_URI"] = mlflow_uri
+            # === instantiate architecture ===
+            # (we always need a fresh HF model to get the correct class & buffers)
+            base_model = ViTForImageClassification.from_pretrained(
+                model_name, num_labels=num_classes
+            )
+    
+            # === try to override with latest MLflow weights ===
 
-            # === Model loading ===
-            if cfg.get("resume_from_mlflow", False):
-                # search MLflow for best run by lowest val_loss
-                df = mlflow.search_runs(
-                    experiment_names=[cfg["mlflow_experiment"]],
-                    filter_string="",
-                    order_by=["metrics.val_loss ASC"],
-                    max_results=1
-                )
-                if len(df) > 0:
-                    run_id = df.loc[0, "run_id"]
-                    model_uri = f"runs:/{run_id}/model"
-                    self.model = mlflow.pytorch.load_model(model_uri)
+
+    
+            client = MlflowClient()  
+            exp    = client.get_experiment_by_name(mlflow_experiment)
+            runs   = client.search_runs(
+                exp.experiment_id,
+                order_by=["attributes.end_time DESC"],
+                max_results=1
+            )
+            if runs:
+                run_id = runs[0].info.run_id
+                print(f"→ fetching checkpoint for run {run_id}")
+            
+                # point at your latest Lightning checkpoint
+                artifact_subpath = "checkpoints/latest_checkpoint.pth"
+                local_path = client.download_artifacts(run_id, artifact_subpath)
+                
+                # if download_artifacts gave us a directory, append the filename;
+                # if it already gave us the file, just use it directly.
+                if os.path.isdir(local_path):
+                    ckpt_path = os.path.join(local_path, os.path.basename(artifact_subpath))
                 else:
-                    self.model = ViTForImageClassification.from_pretrained(
-                        cfg.get("vit_model", "google/vit-base-patch16-224-in21k"),
-                        num_labels=num_classes
-                    )
-            else:
-                self.model = ViTForImageClassification.from_pretrained(
-                    cfg.get("vit_model", "google/vit-base-patch16-224-in21k"),
-                    num_labels=num_classes
-                )
+                    ckpt_path = local_path
+                
+                # now load
+                ckpt = torch.load(ckpt_path, map_location="cpu")
+            
+                # Lightning saves everything under "state_dict"
+                state_dict = ckpt.get("state_dict", ckpt)
+                print("  → checkpoint state_dict keys:", list(state_dict.keys())[:10], "… total:", len(state_dict))
+                print("  → hf model      keys:", list(base_model.state_dict().keys())[:10], "… total:", len(base_model.state_dict()))
+                # if your keys are prefixed like "model.", strip that
+                new_sd = {}
+                for k,v in state_dict.items():
+                    key = k.replace("model.", "")  
+                    new_sd[key] = v
+            
+                print(f"→ loading {len(new_sd)} parameters into the HF model")
+                base_model.load_state_dict(new_sd, strict=False)
+
+
+            # else: no prior run → leave base_model as vanilla pretrained
+    
+            self.model = base_model
 
             if cfg.get("use_lora", False):
                 lora_cfg = LoraConfig(
