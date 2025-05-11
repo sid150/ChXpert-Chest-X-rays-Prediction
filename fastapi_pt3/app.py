@@ -102,6 +102,11 @@ if found_path:
     print("Model loaded and ready for inference.")
 else:
     print("No valid model file found in top runs.")
+    print("Getting DenseNet Model from local or demoModel")  # densenet model too large to fit on github
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    local_file = "./demoModel.pt"  # can copy over densenet model on local storage in place of demo model
+    model = torch.load(local_file, map_location=device)
+    model.eval()
 
 # runs = client.search_runs(experiment_ids=[experiment.experiment_id],
 #                           order_by=["metrics.val_accuracy DESC"],
