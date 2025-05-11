@@ -8,4 +8,5 @@ RUN pip install --no-cache-dir \
     pandas \
     scikit-learn \
     mlflow \
-    peft
+    peft \
+    pynvml
