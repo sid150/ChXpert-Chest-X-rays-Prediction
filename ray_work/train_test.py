@@ -355,7 +355,6 @@ config = {
     'use_lora': False,
     'precision': '32',
     'accumulate_grad_batches': 1,
-    'resume_from_mlflow': False,
     'vit_model': 'google/vit-large-patch16-224-in21k',
     'mlflow_uri': 'http://129.114.26.91:8000',
     'mlflow_experiment': 'vit-chexpert',
