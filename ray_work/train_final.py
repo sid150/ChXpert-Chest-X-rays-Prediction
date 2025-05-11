@@ -22,7 +22,7 @@ from ray.train.lightning import RayTrainReportCallback, RayDDPStrategy
 from peft import LoraConfig, get_peft_model
 from transformers import ViTForImageClassification
 from ray import train
-
+import json
 from torchvision import transforms
 # from lightning.pytorch.profiler import SimpleProfiler  # or AdvancedProfiler
 
@@ -63,7 +63,7 @@ class CheXpertDataset(torch.utils.data.Dataset):
 def get_dataloaders(csv_path, batch_size):
     ds = CheXpertDataset(csv_path=csv_path)
     n = len(ds)
-    subset = int(0.05 * n)
+    subset = int(0.01 * n)
     sv = torch.utils.data.Subset(ds, list(range(subset)))
     val_size = int(0.2 * subset)
     train_size = subset - val_size
@@ -205,12 +205,17 @@ def train_func(config):
         trainer.fit(model, train_loader, val_loader)
 
     if trainer.global_rank == 0:
+        prof_summary = trainer.profiler.summary()
+        prof_path = "profiler_summary.json"
+        with open(prof_path, "w") as f:
+            json.dump(prof_summary, f, indent=2)
+        mlflow.log_artifact(prof_path, artifact_path="profiler")
         mlflow.end_run()
 
 config = {
-    'initial_epochs': 2,
+    'initial_epochs': 0,
     'data_percent_used': 1,
-    'total_epochs': 3,
+    'total_epochs': 1,
     'patience': 1,
     'batch_size': 32,
     'lr': 1e-4,
