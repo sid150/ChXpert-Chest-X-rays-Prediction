@@ -347,6 +347,7 @@ def train_func(config):
 config = {
     'initial_epochs': 1,
     'data_percent_used': 30,
+    'is_retrain': False,
     'total_epochs': 2,
     'patience': 1,
     'batch_size': 64,

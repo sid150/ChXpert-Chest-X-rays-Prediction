@@ -67,7 +67,7 @@ def get_dataloaders(csv_path, batch_size, seed=42):
     n  = len(ds)
 
     # 1) take the last 20% of the full dataset
-    start_idx   = int(0.09 * n)
+    start_idx   = int(0.8* n)
     subset_indices = list(range(start_idx, n))
     subset_ds   = Subset(ds, subset_indices)
     subset_size = len(subset_indices)
@@ -400,6 +400,7 @@ def train_func(config):
 
 config = {
     'initial_epochs': 0,
+    'is_retrain': True,
     'data_percent_used': 1,
     'total_epochs': 1,
     'patience': 1,
