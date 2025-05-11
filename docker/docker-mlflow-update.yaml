@@ -12,7 +12,7 @@ services:
       - "9000:9000"
       - "9001:9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_USER:     ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     healthcheck:
       test: timeout 5s bash -c ':> /dev/tcp/127.0.0.1/9000' || exit 1
@@ -31,27 +31,18 @@ services:
     entrypoint: >
       /bin/sh -c "
       mc alias set minio http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} &&
-      if ! mc ls minio/mlflow-artifacts; then
-        mc mb minio/mlflow-artifacts &&
-        echo 'Bucket mlflow-artifacts created';
-      else
-        echo 'Bucket mlflow-artifacts already exists';
-      fi;
-      if ! mc ls minio/ray; then
-        mc mb minio/ray &&
-        echo 'Bucket ray created';
-      else
-        echo 'Bucket ray already exists';
-      fi"
+      mc mb minio/mlflow-artifacts 2>/dev/null || echo 'mlflow-artifacts exists' &&
+      mc mb minio/ray               2>/dev/null || echo 'ray exists'
+      "
 
   postgres:
     image: postgres:latest
     container_name: postgres
     restart: always
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_USER:     ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_DB:       ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
@@ -66,7 +57,6 @@ services:
       - postgres
       - minio-create-bucket
 
-    # ─── same envs as before ──────────────────────────────────────────────
     environment:
       AWS_ACCESS_KEY_ID:                      ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY:                  ${AWS_SECRET_ACCESS_KEY}
@@ -80,32 +70,35 @@ services:
       - "8000:8000"
 
     volumes:
-      # ensure Gunicorn spools to disk
-      - ./mlflow-tmp:/var/tmp
+      # run metadata (small) goes on big disk
+      - /mnt/block/mlflow/mlruns:/mlflow/mlruns
+      - /mnt/block/mlflow/mlartifacts:/mlartifacts
+      # gunicorn temp spooling also on big disk
+      - /mnt/block/mlflow/tmp:/tmp
 
-    # ─── REPLACE command: with entrypoint: ───────────────────────────────
     entrypoint:
       - /bin/sh
       - -c
       - |
         pip install psycopg2-binary boto3 && \
         exec mlflow server \
-          --backend-store-uri   postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB} \
-          --default-artifact-root  s3://mlflow-artifacts/ \
-          --serve-artifacts \
+          --backend-store-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB} \
+          --default-artifact-root s3://mlflow-artifacts/ \
           --host 0.0.0.0 --port 8000 \
-          --gunicorn-opts="--timeout 600 --workers 2 --worker-tmp-dir /var/tmp"
+          --gunicorn-opts="--timeout 600 --workers 2 --worker-tmp-dir /tmp"
     command: []
 
   jupyter:
     image: quay.io/jupyter/pytorch-notebook:pytorch-2.5.1
     container_name: jupyter
+    restart: always
+    shm_size: 8g
     ports:
       - "8888:8888"
-    shm_size: 8g
     environment:
       - MLFLOW_TRACKING_URI=http://${HOST_IP}:8000/
       - CHEXPERT_DATA_DIR=/mnt/chexpert
+      - MLFLOW_HTTP_REQUEST_TIMEOUT=600
     volumes:
       - /home/cc/ChXpert-Chest-X-rays-Prediction:/home/jovyan/ChXpert-Chest-X-rays-Prediction
       - type: bind
@@ -113,4 +106,5 @@ services:
         target: /mnt/chexpert
         read_only: true
     command: >
-      bash -c "python3 -m pip install mlflow && start-notebook.sh --NotebookApp.notebook_dir=/home/jovyan/ChXpert-Chest-X-rays-Prediction"
+      bash -c "pip install mlflow && \
+                start-notebook.sh --NotebookApp.notebook_dir=/home/jovyan/ChXpert-Chest-X-rays-Prediction"
