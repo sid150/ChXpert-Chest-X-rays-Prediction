@@ -48,7 +48,6 @@ services:
       - ../grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
       - ../grafana/provisioning/dashboards.yaml:/etc/grafana/provisioning/dashboards.yaml
       - ../grafana/provisioning/alerting:/etc/grafana/provisioning/alerting
-      - ../grafana/provisioning:/etc/grafana/provisioning/
       - ../grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
     environment:
       - GF_SECURITY_ADMIN_USER=admin
