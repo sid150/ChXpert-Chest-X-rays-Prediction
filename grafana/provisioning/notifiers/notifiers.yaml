@@ -1,0 +1,10 @@
+apiVersion: 1
+contactPoints:
+  - orgId: 1
+    name: No-op
+    receivers:
+      - uid: aellhnlyo3lkwf
+        type: webhook
+        settings:
+          url: http://localhost/
+        disableResolveMessage: false

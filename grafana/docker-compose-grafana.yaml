@@ -1,0 +1,15 @@
+services:
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana_chxpert
+    ports:
+      - "3100:3000"  # Host port 3100 → Container port 3000
+    depends_on:
+      - prometheus
+    volumes:
+      - ./provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./provisioning/dashboards.yaml:/etc/grafana/provisioning/dashboards.yaml
+      - ./provisioning/alerting:/etc/grafana/provisioning/alerting
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin

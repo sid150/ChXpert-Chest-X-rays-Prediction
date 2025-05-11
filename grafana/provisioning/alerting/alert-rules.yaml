@@ -1,0 +1,234 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: CheXpert
+    folder: CheXpert
+    interval: 30s
+    rules:
+      - uid: fellhog3mhwcgf
+        title: Error Responses
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: aellee8gzlekgd
+            model:
+              adhocFilters: []
+              datasource:
+                type: prometheus
+                uid: aellee8gzlekgd
+              editorMode: code
+              expr: rate(http_requests_total{handler="/predict", status="4xx"}[1m])
+              instant: true
+              interval: ""
+              intervalMs: 15000
+              legendFormat: 4XX
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: aellee8gzlekgd
+            model:
+              adhocFilters: []
+              datasource:
+                type: prometheus
+                uid: aellee8gzlekgd
+              editorMode: code
+              expr: rate(http_requests_total{handler="/predict", status="5xx"}[1m])
+              instant: false
+              interval: ""
+              intervalMs: 15000
+              legendFormat: 5XX
+              maxDataPoints: 43200
+              range: true
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    params: []
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: A
+              hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: last
+              refId: C
+              settings:
+                mode: replaceNN
+                replaceWithValue: 0
+              type: reduce
+          - refId: D
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    params: []
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: B
+              hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: last
+              refId: D
+              settings:
+                mode: replaceNN
+                replaceWithValue: 0
+              type: reduce
+          - refId: E
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    params: []
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: $C + $D
+              hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: E
+              type: math
+          - refId: F
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 20
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    params: []
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: E
+              hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: F
+              type: threshold
+        dashboardUid: f2b5f77b-d9b1-4327-a110-e18133427734
+        panelId: 4
+        noDataState: NoData
+        execErrState: Error
+        for: 1m
+        annotations:
+          __dashboardUid__: f2b5f77b-d9b1-4327-a110-e18133427734
+          __panelId__: "4"
+        isPaused: false
+        notification_settings:
+          receiver: No-op
+      - uid: felljfb9t4ao0f
+        title: Low Prediction Confidence
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: aellee8gzlekgd
+            model:
+              adhocFilters: []
+              datasource:
+                type: prometheus
+                uid: aellee8gzlekgd
+              expr: sum(rate(prediction_confidence_sum[1m])) / sum(rate(prediction_confidence_count[1m]))
+              instant: true
+              interval: ""
+              intervalMs: 15000
+              legendFormat: avg(confidence)
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.65
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        dashboardUid: f4d78079-2852-4af6-847b-ba8d44fe6134
+        panelId: 1
+        noDataState: NoData
+        execErrState: Error
+        for: 1m
+        annotations:
+          __dashboardUid__: f4d78079-2852-4af6-847b-ba8d44fe6134
+          __panelId__: "1"
+        isPaused: false
+        notification_settings:
+          receiver: No-op
