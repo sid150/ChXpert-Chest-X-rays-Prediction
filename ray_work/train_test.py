@@ -65,7 +65,7 @@ def get_dataloaders(csv_path, batch_size, seed=42):
     n  = len(ds)
 
     # 1) take 20% of the full dataset
-    subset_size = int(0.2 * n)
+    subset_size = int(0.05 * n)
     torch.manual_seed(seed)
     full_indices = torch.randperm(n)[:subset_size].tolist()
     subset_ds = Subset(ds, full_indices)
@@ -191,7 +191,7 @@ def train_func(config):
     
             return
     
-        def test_epoch_end(self, outputs):
+        def on_test_epoch_end(self):
             # concatenate all batches
             true  = torch.cat(self._test_true, dim=0).numpy()   # shape (N, C)
             probs = torch.cat(self._test_probs, dim=0).numpy()
@@ -355,6 +355,7 @@ config = {
     'use_lora': False,
     'precision': '32',
     'accumulate_grad_batches': 1,
+    'resume_from_mlflow': False,
     'vit_model': 'google/vit-large-patch16-224-in21k',
     'mlflow_uri': 'http://129.114.26.91:8000',
     'mlflow_experiment': 'vit-chexpert',
@@ -364,7 +365,7 @@ run_config = RunConfig(
     storage_path='s3://ray',
     failure_config=FailureConfig(max_failures=1)
 )
-scale_cfg = ScalingConfig(num_workers=2, use_gpu=True, resources_per_worker={'GPU':1,'CPU':30})
+scale_cfg = ScalingConfig(num_workers=1, use_gpu=True, resources_per_worker={'GPU':1,'CPU':30})
 trainer = TorchTrainer(
     train_func,
     scaling_config=scale_cfg,
