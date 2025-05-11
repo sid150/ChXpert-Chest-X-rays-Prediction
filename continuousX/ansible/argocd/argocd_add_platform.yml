@@ -37,18 +37,18 @@
       set_fact:
         external_ip: "{{ ansible_all_ipv4_addresses | select('match', '^10\\.56\\..*') | list | first }}"
 
-    - name: Ensure gourmetgram-platform namespace exists
+    - name: Ensure chexpert-platform namespace exists
       command: kubectl get namespace gourmetgram-platform
       register: ns_check
       failed_when: false
       changed_when: false
 
-    - name: Create gourmetgram-platform namespace if missing
+    - name: Create chexpert-platform namespace if missing
       when: ns_check.rc != 0
-      command: kubectl create namespace gourmetgram-platform
+      command: kubectl create namespace chexpert-platform
 
     - name: Check if MinIO secret already exists
-      command: kubectl get secret minio-credentials -n gourmetgram-platform
+      command: kubectl get secret minio-credentials -n chexpert-platform
       register: minio_secret_check
       failed_when: false
       changed_when: false
