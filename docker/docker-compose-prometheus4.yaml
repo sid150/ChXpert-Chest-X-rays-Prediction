@@ -45,10 +45,10 @@ services:
     depends_on:
       - prometheus
     volumes:
+      - ../grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
       - ../grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
       - ../grafana/provisioning/dashboards.yaml:/etc/grafana/provisioning/dashboards.yaml
       - ../grafana/provisioning/alerting:/etc/grafana/provisioning/alerting
-      - ../grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
