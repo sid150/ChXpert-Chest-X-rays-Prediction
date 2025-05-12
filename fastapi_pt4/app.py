@@ -162,13 +162,17 @@ async def submit_feedback(
         labels: str = Form(None),
         image_id: str = Form(None),
         filename: str = Form(None),
-        image_b64: str = Form(None)
+        image: UploadFile = File(...)
 ):
     new_data_bucket = "newdata"
     csv_key = "new_data.csv"
 
+    print("image:", image)
+    print("labels:", labels)
+    print("image_id:", image_id)
+
     # Skip feedback case
-    if not labels or not image_id or not image_b64:
+    if not labels or not image_id or not image:
         return {"message": "Feedback not submitted (skipped by user)."}
 
     try:
@@ -199,8 +203,10 @@ async def submit_feedback(
         s3.upload_file("/tmp/new_data.csv", new_data_bucket, csv_key)
 
         # Save image to MinIO
-        image_bytes = base64.b64decode(image_b64)
-        s3.put_object(Bucket=new_data_bucket, Key=f"feedback_images/{filename}", Body=image_bytes)
+        # image_bytes = base64.b64decode(image_b64)
+        # s3.put_object(Bucket=new_data_bucket, Key=f"feedback_images/{filename}", Body=image_bytes)
+        contents = await image.read()
+        s3.put_object(Bucket=new_data_bucket, Key=f"feedback_images/{filename}", Body=contents)
 
         return {"message": "Feedback saved successfully."}
 

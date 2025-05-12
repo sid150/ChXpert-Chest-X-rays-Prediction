@@ -55,33 +55,15 @@ def upload():
     preds, probs = None, None
     if request.method == 'POST':
         f = request.files['file']
-        f.save(os.path.join(app.instance_path, 'uploads', secure_filename(f.filename)))
-        img_path = os.path.join(app.instance_path, 'uploads', secure_filename(f.filename))
+        file_ext = os.path.splitext(f.filename)[1]
+        unique_id = str(uuid.uuid4())
+        unique_filename = f"{unique_id}{file_ext}"
+        save_path = os.path.join(app.instance_path, 'uploads', unique_filename)
+        f.save(save_path)
 
-        preds, probs = request_fastapi(img_path)
-        print("Uploaded image path:", img_path)
+        preds, probs = request_fastapi(save_path)
+        print("Uploaded image path:", save_path)
         print("FastAPI returned:", preds, probs)
-
-    # if preds and probs:
-    #     threshold = 0.5
-    #     # Find the top prediction
-    #     top_idx = probs.index(max(probs))
-    #     top_label = preds[top_idx]
-    #     top_confidence = probs[top_idx]
-    #
-    #     # Create left-aligned output
-    #     output_html = """
-    #     <div style="text-align: left;">
-    #         <h3>Prediction Results:</h3>
-    #         <ul style="list-style-type: none; padding-left: 0;">
-    #     """
-    #
-    #     for cls, prob in zip(preds, probs):
-    #         present = "Present" if prob > threshold else "Absent"
-    #         output_html += f'<li><strong>{cls}</strong>: {prob:.4f} — {present}</li>'
-    #     output_html += "</ul></div>"
-    #
-    #     return output_html
 
     if preds and probs:
         threshold = 0.5
@@ -89,26 +71,19 @@ def upload():
         top_label = preds[top_idx]
         top_confidence = probs[top_idx]
 
-        # Generate unique filename
-        file_ext = os.path.splitext(f.filename)[1]  # Get extension like .jpg
-        unique_id = str(uuid.uuid4())
-        unique_filename = f"{unique_id}{file_ext}"
-        save_path = os.path.join(app.instance_path, 'uploads', unique_filename)
-        f.save(save_path)
-
-        # Prediction results
-        output_html = """
+        output_html = f"""
         <div style="text-align: left;">
             <h3>Prediction Results:</h3>
             <ul style="list-style-type: none; padding-left: 0;">
         """
+
         for cls, prob in zip(preds, probs):
             present = "Present" if prob > threshold else "Absent"
             output_html += f'<li><strong>{cls}</strong>: {prob:.4f} — {present}</li>'
         output_html += "</ul></div>"
 
-        # Prepare feedback form
-        output_html += """
+        # Feedback form
+        output_html += f"""
         <form id="feedback-form" method="POST" action="/submit_feedback" enctype="multipart/form-data">
             <h4 class="mt-4">Optional Feedback (select labels for each condition):</h4>
         """
@@ -126,15 +101,11 @@ def upload():
             </div>
             """
 
-        # Add hidden fields for image metadata
-        with open(save_path, 'rb') as f:
-            image_bytes = f.read()
-        encoded_image = base64.b64encode(image_bytes).decode('utf-8')
-
+        # 👇 Hidden metadata and actual image file input
         output_html += f"""
             <input type="hidden" name="filename" value="{unique_filename}">
             <input type="hidden" name="image_id" value="{unique_id}">
-            <input type="hidden" name="image_b64" value="{encoded_image}">
+            <input type="file" name="image" style="display:none;" />
             <button type="submit" class="btn btn-primary mt-3">Submit Feedback</button>
             <a href="/" class="btn btn-secondary mt-3">Skip Feedback</a>
         </form>
@@ -170,11 +141,12 @@ def submit_feedback():
 
     feedback_payload = {
         'image_id': image_id,
-        'labels': ','.join(labels)
+        'labels': ','.join(labels),
+        'filename': filename
     }
 
     files = {
-        'image': (filename, base64.b64decode(image_b64), 'application/octet-stream')
+        'image': (filename, request.files['image'].read(), 'application/octet-stream')
     }
 
     try:
