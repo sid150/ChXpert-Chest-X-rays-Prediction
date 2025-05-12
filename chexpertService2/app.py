@@ -1,6 +1,6 @@
 import numpy as np
 import requests
-from flask import Flask, redirect, url_for, request, render_template
+from flask import Flask, redirect, url_for, request, render_template, jsonify
 from werkzeug.utils import secure_filename
 import os
 import base64
@@ -153,10 +153,10 @@ def submit_feedback():
         response = requests.post(f"{FASTAPI_SERVER_URL}/submit-feedback", data=feedback_payload, files=files)
         response.raise_for_status()
         # return "<div class='alert alert-success'>Feedback submitted successfully!</div><a href='/' class='btn btn-secondary mt-3'>Back</a>"
-        return {'message': 'Feedback submitted successfully!'}
+        return jsonify({'message': 'Feedback submitted successfully!'})
     except Exception as e:
         print(f"Feedback error: {e}")
-        return {'message': 'Failed to submit feedback.'}, 500
+        return jsonify({'message': 'Failed to submit feedback.'}), 500
         # return "<div class='alert alert-danger'>Failed to submit feedback.</div><a href='/' class='btn btn-secondary mt-3'>Back</a>"
 
 
