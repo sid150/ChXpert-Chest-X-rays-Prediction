@@ -152,10 +152,12 @@ def submit_feedback():
     try:
         response = requests.post(f"{FASTAPI_SERVER_URL}/submit-feedback", data=feedback_payload, files=files)
         response.raise_for_status()
-        return "<div class='alert alert-success'>Feedback submitted successfully!</div><a href='/' class='btn btn-secondary mt-3'>Back</a>"
+        # return "<div class='alert alert-success'>Feedback submitted successfully!</div><a href='/' class='btn btn-secondary mt-3'>Back</a>"
+        return {'message': 'Feedback submitted successfully!'}
     except Exception as e:
         print(f"Feedback error: {e}")
-        return "<div class='alert alert-danger'>Failed to submit feedback.</div><a href='/' class='btn btn-secondary mt-3'>Back</a>"
+        return {'message': 'Failed to submit feedback.'}, 500
+        # return "<div class='alert alert-danger'>Failed to submit feedback.</div><a href='/' class='btn btn-secondary mt-3'>Back</a>"
 
 
 if __name__ == '__main__':

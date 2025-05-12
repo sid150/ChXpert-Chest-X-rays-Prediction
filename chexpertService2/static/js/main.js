@@ -99,11 +99,20 @@ $(document).ready(function () {
             processData: false,
             contentType: false,
             success: function (resp) {
-                alert(resp.message || 'Feedback submitted!');
-                window.location.href = '/';                 // go back to start
+                if (resp && resp.message) {
+                    alert(resp.message);
+                } else {
+                    alert('Feedback submitted!');
+                }
+                window.location.href = '/';  // Redirect to homepage after success
             },
             error: function (xhr) {
-                const msg = xhr.responseJSON?.detail || 'Feedback failed';
+                let msg = 'Feedback failed';
+                if (xhr.responseJSON && xhr.responseJSON.detail) {
+                    msg = xhr.responseJSON.detail;
+                } else if (xhr.responseText) {
+                    msg = xhr.responseText;
+                }
                 alert(msg);
             }
         });
