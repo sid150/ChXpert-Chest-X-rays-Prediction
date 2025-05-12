@@ -78,158 +78,562 @@ The table below shows an example, it is not a recommendation. -->
 
 ### Detailed design plan
 
-<!-- In each section, you should describe (1) your strategy, (2) the relevant parts of the 
-diagram, (3) justification for your strategy, (4) relate back to lecture material, 
-(5) include specific numbers. -->
 
-#### Model Training and Training Platforms
+####  Set Up Persistent Infrastructure
 
-##### Unit 4: Model Training at Scale
+-   **Compute Resource**: Provisioned a `m1.xlarge` VM instance on `KVM@TACC` with a floating IP using the `python-chi` API.
+    
+-   **Security Groups**: Configured ports (`22`, `8888`, `8000`, `9000`, `9001`) for SSH, Jupyter, MLFlow, and MinIO access.
+    
+-   **SSH Access**: Connected securely using provided SSH keys.
+    
 
-###### Train and Re-train
+####  Prepare Object Storage
 
-We use DenseNet121 and ViT-Large as our baseline models for the chest X-ray classification task. Both models are publicly available and can be imported directly from open-source libraries such as `torchvision.models` (for DenseNet121) and Hugging Face Transformers (for ViT-Large). Our dataset is the CheXpert dataset, an open-source chest X-ray dataset released by Stanford, which contains over 224,000 chest radiographs from 65,000+ patients, occupying approximately 450 GB of storage. If storage limitations arise, we will work with a reduced, representative sample of the dataset.
+-   **Storage Service**: OpenStack Swift-based **object store** on `CHI@TACC`.
+    
+-   **Container**: Created container `object-persist-project29` 
+    
 
-To support training and re-training, we store the dataset using Chameleon’s persistent volume block storage, which allows seamless mounting of data across training nodes. Each model is modified by adding a small multi-label classification head suitable for the CheXpert task, and we experiment with two approaches for DenseNet: fine-tuning the pretrained model and training from scratch using randomly initialized weights. For ViT-Large, we will only stick with fine-tuning the full network and fine-tuning the last few layers. The dataset is split into training and re-training subsets to simulate a real-world continual learning pipeline. After training, we compare the performance of the two models to determine which performs better on this task.
+####   Authenticate Storage Access
 
-###### Modeling
+-   **Credential Setup**: Generated an OpenStack application credential (`ID`, `Secret`, `User ID`).
+    
+-   **Rclone Configuration**:
+    
+    -   Config file stored at [`config/rclone.conf`]
 
-We selected DenseNet121 due to its widespread use in chest X-ray classification and its relatively small size of 7.98 million parameters, which enables it to run on low-end GPUs and complete training quickly. This makes DenseNet an ideal choice for establishing a fast and reliable baseline. On the other hand, we use ViT-Large, which has approximately 307 million parameters, as a high-capacity model capable of leveraging the large CheXpert dataset. Its self-attention mechanism allows ViT-Large to capture long-range dependencies across the image, making it well-suited for detecting subtle and diffuse abnormalities such as cardiomegaly and infiltrates, which span larger spatial regions in radiographs.
+```
+[chi_tacc]
+type = swift
+user_id = YOUR_USER_ID
+application_credential_id = APP_CRED_ID
+application_credential_secret = APP_CRED_SECRET
+auth = https://chi.tacc.chameleoncloud.org:5000/v3
+region = CHI@TACC
+```
 
-As ViT-Large cannot run on a single low-end GPU, we will leverage training strategies discussed in Unit 4 such as gradient accumulation, reduced precision (float16), and mixed precision training using AMP. Furthermore, we will experiment with parameter-efficient fine-tuning methods like LoRA and QLoRA, which allow us to fine-tune only a small number of parameters, making large-model fine-tuning feasible within limited memory constraints.
+        
+    -   Verified access with `rclone lsd chi_tacc:`
+        
 
-###### Attempting Difficulty Points
+####  Dockerized ETL Pipeline
 
-To satisfy the “training strategies for large models” requirement, we use ViT-Large to test various techniques including gradient accumulation, mixed precision training, and LoRA/QLoRA. These methods are designed to reduce memory usage and speed up training without compromising model performance. We will conduct experiments measuring the impact of each strategy on memory footprint, training time, and validation AUROC, and report the results using plots and metrics similar to those used in the Unit 4 lab assignment.
+All stages are defined in [`docker-compose-etl.yaml`](https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/blob/main/docker/docker-compose.yaml) and share the volume `chexpert-data`.
 
-We will also attempt to “use distributed training to increase velocity.” For DenseNet121, we can apply DistributedDataParallel (DDP) across multiple GPUs and evaluate how it scales with 1, 2, and 4 GPUs. For ViT-Large, we aim to use FullyShardedDataParallel (FSDP) to reduce memory consumption and enable large-scale fine-tuning. In both cases, we will measure training time per epoch and throughput (images per second) and plot these against the number of GPUs used to evaluate scaling efficiency.
+**Extract Stage** – Downloads dataset  
+Container downloads and unzips the CheXpert ZIP to `/data/CheXpert`.
 
----
+**Transform Stage** – Organizes data  
+[transform-data.py](https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/blob/main/docker/docker-compose.yaml)  
+Python script structures images by class/label under `/data/CheXpert/train/[label]`.
 
-##### Unit 5: Model Training Infrastructure and Platform
+**Load Stage** – Uploads to object store  
+[docker-compose.yaml](https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/blob/main/docker/docker-compose.yaml)  
+Pushes processed dataset to `object-persist-netID` using `rclone`.
 
-###### Experiment Tracking
-
-We will track all experiments using MLflow, including model configurations, hyperparameters, training time, memory usage, and performance metrics. Our experiments include training DenseNet121 from scratch versus fine-tuning, as well as full and partial fine-tuning of ViT-Large. For each model, we will perform sweeps over learning rates (e.g., 1e-3, 1e-4, 5e-5) and batch sizes (e.g., 4, 8, 16, depending on GPU memory). We closely monitor GPU utilization, epoch duration, and memory usage to optimize training efficiency.
-
-The main metric we use to evaluate model performance is the Area Under the ROC Curve (AUC), which is standard in medical classification tasks. For each experiment, we log per-class AUC scores along with training curves to assess overfitting and generalization. By systematically comparing these logs, we can select the best hyperparameter settings for each model.
-
-###### Scheduling Training Jobs
-
-We will use Ray Train to schedule and manage distributed training jobs across multiple nodes on Chameleon Cloud. Ray provides a clean abstraction over PyTorch, allowing us to launch training runs using DDP or FSDP with minimal code changes. We will run a Ray cluster and submit jobs to it as part of our continuous training pipeline, which lets us queue experiments such as LoRA vs. QLoRA, AMP vs. FP32, and different GPU counts. This setup helps us maximize cluster utilization and accelerate experimentation.
+#### Execution (Run Sequentially)
 
 
-#### Model serving and monitoring platforms
+`docker compose -f docker/docker-compose-etl.yaml run extract-data
+docker compose -f docker/docker-compose-etl.yaml run transform-data export RCLONE_CONTAINER=object-persist-project29
+docker compose -f docker/docker-compose-etl.yaml run load-data` 
 
-<!-- Make sure to clarify how you will satisfy the Unit 6 and Unit 7 requirements, 
-and which optional "difficulty" points you are attempting. -->
-##### Unit 6:
-<ins>Serving from an API endpoint:</ins>
-	Use FastAPI in conjunction with the frontend and pytorch vision model.
-Identify requirements:
-    - Model Size: TBD
-    - Single Sample Online Inference Latency: less than 1 second
-    - Cloud Deployment Concurrency: 4
-    - These requirements are determined from a single business/clinic accessing the vision model.
+####   Persisted Dataset Usage
+
+-   Training containers can now **pull from object storage**, avoiding repeated downloads.
+## Set Up the Block Storage Volume
+
+1.  SSH into your compute instance (e.g., `node-persist`):
+    
+    `ssh -i ~/.ssh/id_rsa_chameleon cc@<FLOATING_IP>` 
+    
+2.  Verify the block storage volume appears by running:
  
-<ins>Model optimizations to satisfy requirements:</ins>
-	Convert pytorch model to ONNX model and run with ONNX runtime to compare inference times. Compare the regular ONNX model with the dynamically quantized model. Other optimizations may be tested as the project progresses. 
+    `lsblk` 
+    
+3.  Partition and format the volume:
 
-<ins>System optimizations to satisfy requirements:</ins>
-	Attempt to use Triton inference server with multiple GPUs with both python backend and ONNX backend to compare performance. 
+    `sudo parted -s /dev/vdb mklabel gpt
+    sudo parted -s /dev/vdb mkpart primary ext4 0% 100%` 
+    
+4.  Verify the partition (`vdb1`) is created:
+    
+    `lsblk` 
+    
+5.  Format the partition with **ext4** filesystem:
+    
+    `sudo mkfs.ext4 /dev/vdb1` 
+    
+6.  Create a directory to mount the volume:
 
-<ins>Develop multiple options for serving(EXTRA DIFFICULTY POINTS):</ins>
-	Compare multiple local on-device machine performance with server-grade CPU inference performance. 
+    `sudo mkdir -p /mnt/block
+    sudo mount /dev/vdb1 /mnt/block` 
+    
+7.  Change ownership of the mount point:
+    
+    `sudo chown -R cc /mnt/block
+    sudo chgrp -R cc /mnt/block` 
+    
+8.  Verify the mount:
+    `df -h` 
+    
 
-##### Unit 7:
-(Note, no lab performed yet, will update accordingly once experience is had)
-<ins>Offline evaluation of model:</ins>
-	Create automated evaluation plan in conjunction with MLFlow for metrics logging. Create concurrency tests and cloud tests for domain specific use cases, and also a simple standard use case. Test on special test batches of data that was highly misclassified(some certain disease). 
-	Finally automatically save and register the model if passing evaluation criteria.
-<ins>Load test in staging:</ins>
-	This will be part of continuous X pipeline, and like the model serving lab, multiple requests will be made concurrently to simulate the real-world use case described in the business-specific evaluation part. 
+You should see the volume mounted on `/mnt/block`.
 
-<ins>Online evaluation in canary stage:</ins>
-	Figure out a way to replicate real world users on certain device types. Similar to load test stage, run concurrent inference tasks as defined by business-specific evaluation and analyze results to see if they meet the requirements posed. Methods used will be similar to lab 7.
+----------
 
-<ins>Close the loop:</ins>
-	On the front-end website, users uploading X-rays for model prediction will be given a choice of buttons to choose from indicating whether the model’s prediction was accurate or not. This will simulate doctor’s opinion on the X-ray classification and generate new online data with ground truth labels. 
+## Use Docker Volumes on Persistent Storage
 
-<ins>Define a business-specific evaluation:</ins>
-	Deploy in production the model inference service to half of users. Measure, and log the inference latencies. Compare these inference latencies to the accuracy and time it takes for physicians/doctors to notice issues in X-ray. Additionally, evaluate the time saved by using automated model inference on X-rays instead of relying on time it takes for x-ray to be sent to a physician computer, then opened and checked once a doctor is available. Hopefully, this will showcase a benefit of using this ML system to detect issues in X-rays automatically instead of having to spend precious time and human resources to figure out whether an X-ray and patient need to be examined in further detail. 
+Now, let’s set up **MLFlow** for experiment tracking, **PostgreSQL**, and **MinIO** using Docker Compose, with data persistence backed by the block storage volume.
+
+### Bring Up Services with Docker Compose
+
+1.  Run the following command to bring up the services (MLFlow, PostgreSQL, MinIO, and Jupyter):
+    
+    `HOST_IP=$(curl --silent http://169.254.169.254/latest/meta-data/public-ipv4) \
+    docker compose -f ~/data-persist-chi/docker/docker-compose-block.yaml up -d` 
+    
+2.  Retrieve the logs to get the link to the Jupyter notebook interface:
+   
+    
+    `docker logs jupyter` 
+    
+3.  Open the Jupyter notebook interface by substituting the **floating IP** in the browser:
+    
+    `http://<FLOATING_IP>:8888/lab?token=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX` 
+    
+4.  Also, access the MLFlow web UI at:
+    
+    
+    `http://<FLOATING_IP>:8000` 
+    
+
+----------
+
+## Verify Persistence After Deleting and Recreating the Instance
+
+### Create a New Instance
+
+1.  Create a new instance:
+
+    `s = server.Server(f"node-persist-{username}", image_name="CC-Ubuntu24.04", flavor_name="m1.large")
+    s.submit(idempotent=True)
+    s.associate_floating_ip()
+    s.refresh()
+    s.check_connectivity()` 
+    
+
+### Attach the Block Storage Volume to the New Instance
+
+2.  Attach the existing block storage volume to the new instance:
+    `cinder_client = chi.clients.cinder()
+    volume = [v for v in cinder_client.volumes.list() if v.name == 'block-persist-netID'][0]
+    volume_manager = chi.nova().volumes
+    volume_manager.create_server_volume(server_id=s.id, volume_id=volume.id)` 
+    
+
+### Verify Data Availability
+
+3.  SSH into the new instance and mount the block storage volume:
+    `sudo mkdir -p /mnt/block
+    sudo mount /dev/vdb1 /mnt/block` 
+    
+4.  Verify that the data is still available:    
+    `ls /mnt/block` 
+    
+6.  Use Docker Compose to bring the services back up:
+    
+    `HOST_IP=$(curl --silent http://169.254.169.254/latest/meta-data/public-ipv4) \
+    docker compose -f ~/data-persist-chi/docker/docker-compose-block.yaml up -d` 
+    
+7.  Open the MLFlow web UI at:
+    
+    `http://129.114.26.91:8000` 
+    
+    Confirm that previous experiment logs are present.
+    
+
+----------
+
+## Reference: Managing Block Storage Using Python
+[block_store.py](https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/blob/main/block_store.py)
+### List Volumes
+
+`cinder_client = chi.clients.cinder()
+cinder_client.volumes.list()` 
+
+### Create a Block Storage Volume
+
+`volume = cinder_client.volumes.create(name=f"block-persist-python-{username}", size=2)
+volume._info` 
+
+### Attach a Volume to a Compute Instance
+`server_id = chi.server.get_server(f"node-persist-{username}").id volume_manager = chi.nova().volumes
+volume_manager.create_server_volume(server_id=s.id, volume_id=volume.id)` 
+
+### Delete the Volume
+`volume_manager.delete_server_volume(server_id=s.id, volume_id=volume.id)` 
+`cinder_client.volumes.delete(volume=volume)` 
+
+---------
 
 
-#### Data pipeline
+## ContinuousX
 
-<!-- Make sure to clarify how you will satisfy the Unit 8 requirements,  and which 
-optional "difficulty" points you are attempting. -->
+For this repository, **Terraform**  is used in a declarative style to provision cloud resources, while automation tools like **Ansible**, **ArgoCD**, and **helm**  are used to manage and configure software components in the infrastructure.
 
-<ins>Persistent Storage:</ins>
-	Following Lab 8, we will use persistent storage through Chameleon, and we will store the main dataset of around 400+ Gigabytes, model checkpoints, the CNN model and ViT model, and container images for inferencing. 
+### Tools for IaC
 
-<ins>Offline data:</ins>
-	We will keep unstructured training data of Chest X-ray images in a repository of persistent storage as defined above.
+1.  **Ansible**: Ansible is a powerful tool for automating the configuration of servers, installation of software, and deployment of applications. It uses simple YAML-based configuration files (known as playbooks) to automate tasks.
+    
+2.  **ArgoCD**: ArgoCD is a Kubernetes-native continuous delivery tool that automates the deployment of applications to Kubernetes clusters. It uses Git repositories as the source of truth for the application's desired state and automates the deployment process to ensure the current state matches the desired state defined in Git.
+    
+3.  **Helm**: Helm is a Kubernetes package manager that simplifies the deployment of applications on Kubernetes by defining reusable and versioned packages called charts. Helm charts allow you to automate the installation and configuration of complex Kubernetes resources.
+    
+4.  **python-chi**: This tool is a Python-based IaC solution that facilitates the management of infrastructure resources. It’s often used in conjunction with other tools for automating deployment and ensuring consistency.
+    
 
-<ins>Data pipelines:</ins>
-	We have a simple ETL pipeline due to using image classification, we will convert the images into the proper input size by resizing to the required shape and still stored as images. During model training or inferencing, the data will be converted to pytorch tensor and normalized. Data source is CheXpert dataset of image files, and resizing will be done through the Pillow library function. 
+### Example of Declarative IaC using Terraform
 
-<ins>Online data:</ins>
-	In order to evaluate our MLOps system for chest X-ray image classification in a real-time environment, we will simulate the arrival of "online data", mimicking the behavior of X-ray images being submitted in a clinical setting for inference. This simulation is critical to test the robustness, latency, and scalability of our streaming pipeline and inference service.
-We will implement a Python-based data simulator that reads X-ray images from a local directory and sends them to our deployed inference API endpoint. The script will simulate two types of data arrival patterns, single and batch. Simulated data will be data not form CheXpert dataset but other similar positional images of chest X-rays with the ground truth label supplied of either having a medical issue or not. These new images should have an inference performed on them and then put into a folder for future model-retraining if necessary. 
+With **Terraform**, you write the infrastructure configuration as code. For example, to provision an EC2 instance in Chameleon on [main.tf](https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/blob/main/continuousX/tf/kvm/main.tf)
+The  `tf/kvm`  directory in our IaC repository includes the following files,
+
+```
+├── data.tf
+├── main.tf
+├── outputs.tf
+├── provider.tf
+├── variables.tf
+└── versions.tf
+```
+
+By executing `terraform apply`, Terraform will read this configuration and provision the infrastructure as described. The benefit is that you can version control the configuration in Git, and automatically deploy the exact same infrastructure on demand.
+
+## Cloud-Native Development
 
 
-#### Continuous X
+For this project, the model training, evaluation, prediction, and other services are containerized using **Docker**. Each service (e.g., model training, model serving, data preprocessing) is developed as a separate microservice and then packaged into a Docker container. These containers are then orchestrated by **Kubernetes**, which handles scaling and management.
 
-<!-- Make sure to clarify how you will satisfy the Unit 3 requirements,  and which 
-optional "difficulty" points you are attempting. -->
-#### Containerized & Microservice-Based System  
+### Example Dockerfile for the Model Service
 
-<ins>Data Ingestion:</ins>  
-A microservice fetches and preprocesses X-ray images, storing them in **Chameleon Cloud**.  
+Here’s an example `Dockerfile`  for containerizing the chest X-ray model:
 
-<ins>Model Training:</ins>  
-Runs in a **containerized environment** on Chameleon Cloud using **Ray Train** and **Jupyter Notebooks** for experimentation.  
-**Containerized batch jobs** handle production training.  
+dockerfile
 
-<ins>Model Serving:</ins>  
-The trained model is deployed as a **REST API** using **FastAPI**.  
-Runs inside a **Kubernetes (K8s) cluster** for scalability.  
+`# Use a base Python image
+FROM python:3.8-slim`
 
-<ins>Immutable Deployments:</ins>  
-All infrastructure and configurations are **defined in Git** and **version-controlled**.  
-Changes are applied automatically **without manual intervention**.  
+# Install necessary dependencies
+RUN pip install --upgrade pip
+RUN pip install -r requirements.txt
 
-#### CI/CD and Continuous Training Pipeline  
+# Copy the model training code into the container
+COPY . /app
+WORKDIR /app
 
-<ins>Triggering Mechanisms:</ins>  
-A **new dataset upload** or a **Git commit** to the model repository triggers the pipeline.  
-Automated **retraining jobs** are scheduled periodically using **GitHub Actions**.  
+# Set the entry point to run the application
+`CMD ["python", "app.py"]` `
 
-<ins>Pipeline Workflow:</ins>  
-1. **Data Preprocessing & Augmentation**  
-   Raw X-ray images are **cleaned, normalized, and augmented** before training.  
+This `Dockerfile`  specifies the Python version to use, installs dependencies from a `requirements.txt`  file, copies the project files into the container, and sets the entry point to run the application. The container can then be easily deployed on a cloud service or Kubernetes.
 
-2. **Model Training & Validation**  
-   The model is trained inside a **containerized Chameleon Cloud instance** using **PyTorch** with **GPU acceleration**.  
+## CI/CD and Continuous Model Training
 
-3. **Evaluation & Optimization**  
-   Performance is assessed using metrics like **AUC** and **F1-score**.  
-   **Quantization** or **pruning** is applied for efficient inference.  
+#### CI/CD Workflow for Model Retraining
 
-4. **Model Packaging & Registry**  
-   The best-performing model is stored in **MLFlow** for versioning and management.  
+The CI/CD pipeline for this project automates the entire model lifecycle can be found in the folder [workflows](https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/tree/main/continuousX/k8s)
 
-5. **Deployment Automation:**  
-   The new model is **containerized** and **deployed automatically** to the **staging environment**.  
+1.  **Trigger**: The pipeline is triggered when code changes are pushed to the repository, a schedule is met, or external data updates are available.
+    
+2.  **Retraining**: The pipeline starts by retraining the model with the latest data.
+    
+3.  **Evaluation**: After training, the model undergoes an offline evaluation to measure its performance (e.g., accuracy, precision).
+    
+4.  **Optimization**: Post-training optimizations are applied to improve the model's performance for real-time inference.
+    
+5.  **Testing**: The model is tested to ensure its integration with the other services and APIs.
+    
+6.  **Dockerization**: The trained model is packaged into a Docker container, which can be easily deployed in cloud or on-premise environments.
+    
+7.  **Staging Deployment**: The model is deployed in a staging environment for further testing.
+    
 
-#### Staged Deployment Strategy  
+## Staged Deployment
 
-<ins>Staging Environment:</ins>  
-The updated model is tested in a **sandboxed Chameleon Cloud instance**.  
-A subset of **traffic is routed** to the new model while monitoring **real-time performance metrics** (e.g., inference latency, prediction correctness).  
+### What is Staged Deployment?
 
-<ins>Production Deployment:</ins>  
-Once validated, the model is **fully deployed** on a **Kubernetes cluster** for **scalable and robust production use**.  
+In this project, we define three primary deployment stages using [ArgoCD](https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/tree/main/continuousX/workflows):
 
+1.  **Staging**: The model is deployed in a non-production environment where it undergoes further testing, validation.
+    
+2.  **Canary**: A small subset of users is routed to the new model in a canary deployment. This allows real-world testing with limited traffic before full production release.
+    
+3.  **Production**: Once the model passes the canary phase, it is promoted to production, where it serves all users.
+    
+
+### Example Kubernetes Deployment for Staging
+
+Here’s an example Kubernetes YAML configuration for deploying the model in a [**staging**  environment](https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/blob/main/continuousX/k8s/staging/templates/chexpert-app.yaml):
+
+```apiVersion: v1
+kind: Service
+metadata:
+  name: chexpert-app
+  namespace: chexpert-staging
+spec:
+  selector:
+    app: chexpert-app
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: 8000
+  externalIPs:
+    - {{ .Values.service.externalIP }}
+    
+   ```
+
+The Kubernetes configuration deploys the model with three replicas for load balancing in the staging environment.
+
+
+
+
+
+
+
+
+
+
+##  Model Training
+
+1. **SSH into your persistent CPU node** (allocate via Terraform or the Chameleon portal):
+
+   ```bash
+   ssh cc@<CPU_NODE_IP>
+   cd ChXpert-Chest-X-rays-Prediction/docker
+   ```
+the docker file can be found at [docker/docker-mlflow-update.yaml](docker/docker-mlflow-update.yaml)
+
+
+2. **Launch the MLflow stack** with MinIO and Postgres:
+
+   ```bash
+   HOST_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+   MINIO_ROOT_PASSWORD={} \
+   AWS_ACCESS_KEY_ID={} \
+   AWS_SECRET_ACCESS_KEY={} \
+   POSTGRES_USER={} \
+   POSTGRES_PASSWORD={} \
+   POSTGRES_DB={} \
+   docker compose -f docker-mlflow-update.yaml up -d
+   ```
+
+   * View **MLflow UI** at `http://129.114.26.91:8000`
+   * Access **MinIO** at `http://129.114.26.91:9000` (credentials: can be found at [ray_work/environment.txt](ray_work/environment.txt))
+
+3. **Reserve a GPU instance** (via Chameleon portal or Terraform). Record its IP as `<GPU_NODE_IP>`.
+
+4. **SSH into the GPU node** and install all environment dependencies and mount the CheXpert dataset:
+the [train_setup.ipynb](train_setup.ipynb) contains the cells to allocate fip and install cuda dependencies and also contains commands that should be run after ssh-ing into the gpu instance to mount object store
+
+   ```bash
+   ssh cc@<GPU_NODE_IP>
+   ```
+
+   * This creates `/mnt/object` containing the dataset.
+
+5. **On the GPU node**, set up the Ray cluster:
+the docker file is [docker/docker-compose-ray-cuda-req.yaml](docker/docker-compose-ray-cuda-req.yaml)
+
+   ```bash
+    HOST_IP=$(curl --silent http://169.254.169.254/latest/meta-data/public-ipv4 ) MINIO_ROOT_USER={}  MINIO_ROOT_PASSWORD={} AWS_ACCESS_KEY_ID={}  AWS_SECRET_ACCESS_KEY={}  POSTGRES_USER={}  POSTGRES_PASSWORD={}  POSTGRES_DB={}  docker compose -f  ChXpert-Chest-X-rays-Prediction/docker/docker-compose-ray-cuda-req.yaml up -d
+   ```
+
+6. **Start the Jupyter + Ray client** on the GPU node:
+
+   ```bash
+   cd ChXpert-Chest-X-rays-Prediction/docker
+   # Build image
+   docker build -t jupyter-ray -f Dockerfile.jupyter-ray .
+   # Run container
+   HOST_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+   docker run -d --rm -p 8888:8888 \
+     -v ../:/home/jovyan/work/ \
+     --mount type=bind,source=/mnt/object,target=/mnt/ \
+     -e RAY_ADDRESS=http://${HOST_IP}:8265/ \
+     --name jupyter jupyter-ray
+    docker logs jupyter
+   ```
+
+   * Open **Jupyter Lab** at logs
+   * Ray Dashboard available at `http://<GPU_NODE_IP>:8265`
+
+
+### 1. Modeling
+
+**Objective**: Predict 14 binary disease labels from 224×224 chest X-ray crops in a patient-wise train/val/test split to avoid data leakage.
+
+**Data Leakage Prevention**
+We group all images by patient ID and ensure that each patient’s scans appear in only one of the train, validation, or test sets. Our custom PyTorch DataLoader uses a lookup table mapping patient IDs to splits, so no patient’s images leak across splits.
+
+**Uncertainty Labels Handling**
+The CheXpert dataset annotates some labels as “uncertain.” Because this is a triage task, we treat uncertainty as a positive finding. All labels marked uncertain are converted to 1 during preprocessing, prioritizing sensitivity.
+
+**Input Processing**
+
+* Raw grayscale X-rays are resized to 224×224.
+* We duplicate the single channel into three channels.
+
+**Model Architecture**
+We utilize the [ViT-Base-Patch-16](https://huggingface.co/google/vit-base-patch16-224) pretrained on ImageNet:
+
+* **Patch Embedding**: Splits image into 16×16 patches capturing local details.
+* **Multi-Head Self-Attention**: Learns relationships between spatial regions, enabling detection of both localized and diffuse pathologies.
+* **Positional Encoding**: Retains global spatial context.
+* **Classification Head**: A fully connected layer outputs a 14-dimensional vector with sigmoid activation.
+
+**Use Case**
+In a clinical setting, radiologists feed a patient’s scans into the model. The output scores rank potential findings, allowing clinics to triage urgent cases (e.g., pneumothorax first) while optionally reordering labels based on local protocols.
+
+
+
+## 2. Train & Retrain
+
+1. **Initial training** using Ray Train and MLflow:
+
+   ```bash
+   # From the GPU Jupyter terminal
+   cd work/ray_work
+   ray job submit \
+     --runtime-env runtime.json \
+     --working-dir . \
+     -- python train_test.py
+   ```
+
+   * Training script: [ray_work/train_test.py](ray_work/train_test.py) logs metrics and checkpoints to MLflow on `129.114.26.91:8000`.
+
+2. **Non-interactive retraining** automatically loads the best run checkpoint:
+
+   ```bash
+   cd ChXpert-Chest-X-rays-Prediction/ray_work
+   ray job submit \
+     --runtime-env runtime.json \
+     --working-dir . \
+     -- python retrain.py
+   ```
+
+   * Retrain script: [ray_work/retrain.py](ray_work/retrain.py) fetches the latest best run from MLflow and resumes training.
+
+
+
+## 3. Experiment Tracking
+
+* **MLflow UI**: `http://129.114.26.91:8000` (view runs, metrics, and artifacts).
+* **Artifacts stored** in MinIO bucket `mlflow`; **metadata** in Postgres DB `mlflowdb`.
+
+
+
+
+## 4. Scheduling and optional
+
+* **Scheduling**: All jobs submitted via `ray job submit` on the GPU node.
+* **Resilience**: Implemented Ray Train fault tolerance and automatic retries from latest checkpoint can be found in [ray_work/train_test.py](ray_work/train_test.py) at the end Failconfig().
+* **Distributed Training**: Performed Experiments with DDP (2 GPUs) and FSDP accelerated training by changing the config in ray train Trainer(strategy=).
+* **Details available** in MLflow at `http://129.114.26.91:8000` under each run's logs and artifacts.
+
+
+Unit 6 and 7: MODEL SERVING AND EVALUATION PERSON - 2 minutes
+Serving from an API endpoint: Describe how you set up the API endpoint. What is the input? What is the output?
+The API endpoint is implemented using FastAPI, which serves as the backend for inference. The Flask dontend provides a web interface for users who can upload chest X-ray images from their local machine.
+Input: Single Chest X-ray (or any) image from user sent to back end as an encoded string payload. 
+Output: The predictions of the model and the confidence levels for each class are then sent to the frontend and displayed under the uploaded image once the “submit” button has been pressed.
+Identify requirements: Discuss requirements with respect to the specific customer.
+Requirements of the customer in mind include, not too large of model size for serving, less than 5 GB, which is met by both densenet and ViT models. The regular torch ViT model for inferencing only takes 160 ms to inference a single image(Grafana monitoring) which is well below the customer’s required few seconds. 
+Model optimizations: Show the part of your repo that implements this, and discuss the results!
+Many model optimization tests were done utilizing a pytorch compiled model, onnx model, graph optimized onnx model, a dynamic quantized onnx model, a conservatively and static quantized onnx model. The onnx models were also tested on CUDA execution provider along with CPU execution provider. The regular onnx model was also tested on OpenVINO execution provider. The cuda execution provider with optimized onnx model ran fastest for batch inferencing, then the cuda provider with regular onnx model, then the OpenVINO with regular onnx model, then finally the regular onnx model with CPU provider. The compiled torch model actually ran better than any of the quantized models and the regular torch model ran the slowest. 
+System optimizations: Show the part of your repo that implements this, and discuss the results!
+System Evaluation/Monitoring:  
+Docker Services Overview:
+-------------------------
+- fastapi_server: Hosts the ML model for inference and exposes metrics at /metrics.
+- flask: Frontend for uploading X-ray images and optional user feedback.
+- prometheus: Scrapes metrics from FastAPI and cAdvisor.
+- grafana_chexpert: Visualizes metrics on port 3100, with auto-provisioned dashboards.
+- jupyter: Provides a notebook environment to run evaluation scripts.
+- cadvisor: Monitors container-level resource usage (CPU, memory).
+
+How to Start the System:
+------------------------
+Run the following command to build and start the services:
+
+    docker compose -f docker/docker-compose-prometheus6.yaml up --build -d
+
+This builds and runs all containers in the background.
+
+Accessing Services:
+-------------------
+Replace A.B.C.D with the IP of your node server.
+
+- Flask UI: http://A.B.C.D:5050
+- FastAPI Docs: http://A.B.C.D:8000/docs
+- Grafana Dashboard: http://A.B.C.D:3100 (admin / admin)
+- Prometheus UI: http://A.B.C.D:9090
+- Jupyter Lab: http://A.B.C.D:8888
+- cAdvisor: http://A.B.C.D:8080
+
+Grafana Monitoring:
+-------------------
+Grafana uses automatic provisioning from the mounted directory:
+
+    ../grafana/provisioning/
+
+To view dashboards:
+1. Go to http://A.B.C.D:3100
+2. Check dashboards for prediction metrics and container resource usage.
+
+Prometheus Metrics Examples:
+----------------------------
+- rate(prediction_confidence_bucket[1m]) – View prediction confidence trends.
+- predicted_class_total – View prediction frequency per class.
+
+Running Model Evaluation:
+-------------------------
+1. Open Jupyter Lab: http://A.B.C.D:8888 and paste in token from `docker logs jupyter`
+2. Open and run onlineEvalTest.ipynb from `work` directory
+home/jovyan/work3. The notebook will test model inference and monitor metrics in real-time.
+
+The dataset is mounted into the container at /mnt/dataset from your host’s /mnt/object2.
+The grafana panels include service monitoring with requests per second info, average request duration, request duration percentiles, and an error status. The prediction monitoring dashboard includes average prediction confidence info, cumulative prediction confidence info, prediction confidence occurrences across time range, and predicted class totals across time range. 
+Additionally, handling human feedback has been implemented.
+This MLOps system supports human-in-the-loop feedback on predictions to enhance model monitoring and retraining efforts.
+
+### Feedback Collection Flow
+
+1. **User Interaction (Flask Frontend)**
+   - After uploading a chest X-ray image and viewing the model's predictions, users are prompted to optionally provide feedback.
+   - For each of the 14 diagnosis classes, users can select:
+     - **Present (1)**
+     - **Absent (0)**
+     - **Uncertain (-1)**
+     - Or leave blank to skip
+
+2. **Data Submission to FastAPI**
+   - The selected labels, along with the corresponding image (sent via `multipart/form-data`), are submitted to the FastAPI backend.
+
+3. **Storage in MinIO**
+   - Feedback data is stored in a MinIO bucket named `newdata`.
+     - A CSV file (`new_data.csv`) stores metadata including:
+       - `image_id` (UUID)
+       - 14 label columns: `class_0` to `class_13`
+     - Images are saved under `feedback_images/` using their UUID filenames.
+
+4. **Use for Continuous Evaluation & Retraining**
+   - This dataset of human-labeled examples can be used for:
+     - Model performance audits
+     - Active learning
+     - Periodic retraining or fine-tuning
+
+This loop enables better tracking of real-world model performance and user trust alignment.
+
+Define a business-specific evaluation: Describe this hypothetical evaluation; it’s not something you actually implement.
+Optional: Develop multiple options for serving: If you attempt this difficulty point, make sure I know it! Show the parts of the repo that implement each option, and show a comparison of the options with respect to performance and cost of deployment on a commercial cloud. (You can use a commercial cloud cost calculator to estimate costs. Show your work.)
 
 
