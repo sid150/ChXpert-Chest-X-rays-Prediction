@@ -1,0 +1,4 @@
+Flask
+numpy
+requests
+tritonclient[http]
