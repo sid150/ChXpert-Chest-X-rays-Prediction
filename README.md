@@ -555,12 +555,13 @@ System Evaluation/Monitoring:
 
 Docker Services Overview:
 -------------------------
-- fastapi_server: Hosts the ML model for inference and exposes metrics at /metrics.
-- flask: Frontend for uploading X-ray images and optional user feedback.
+- fastapi_server: Hosts the ML model for inference and exposes metrics at /metrics. [Link to final app](https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/tree/main/fastapi_pt4)
+- flask: Frontend for uploading X-ray images and optional user feedback. [Link to final app](https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/tree/main/chexpertService2)
 - prometheus: Scrapes metrics from FastAPI and cAdvisor.
-- grafana_chexpert: Visualizes metrics on port 3100, with auto-provisioned dashboards.
-- jupyter: Provides a notebook environment to run evaluation scripts.
+- grafana_chexpert: Visualizes metrics on port 3100, with auto-provisioned dashboards.[Provisioned](https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/tree/main/grafana)
+- jupyter: Provides a notebook environment to run evaluation scripts. [jupyter container used](https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/tree/main/jupyterServing)
 - cadvisor: Monitors container-level resource usage (CPU, memory).
+[Link to final serving docker compose file](https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/blob/main/docker/docker-compose-prometheus6.yaml)
 
 How to Start the System:
 ------------------------
@@ -606,6 +607,13 @@ The dataset is mounted into the container at /mnt/dataset from your host’s /mn
 The grafana panels include service monitoring with requests per second info, average request duration, request duration percentiles, and an error status. The prediction monitoring dashboard includes average prediction confidence info, cumulative prediction confidence info, prediction confidence occurrences across time range, and predicted class totals across time range. 
 Additionally, handling human feedback has been implemented.
 This MLOps system supports human-in-the-loop feedback on predictions to enhance model monitoring and retraining efforts.
+
+Also, Model optimizations are done using onnx runtime, compiled torch model, and different onnx execution providers including GPU.
+[Torch inference test](https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/blob/main/inferenceTesting/measure_torch.ipynb)
+[Compiled Torch](https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/blob/main/inferenceTesting/measure_torch_compiled.ipynb)
+[Onnx](https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/blob/main/inferenceTesting/onnxInferenceNodeTest2.ipynb)
+[OpenVINO](https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/blob/main/inferenceTesting/openvinoTest.ipynb)
+Due to system development being late, the fastapi server uses a direct torch model for serving. It attempts to load the best validation accuracy model it can find from mlflow run id and matches it to the minio block storage. If it doesn't find a model on minio, it will load a local model in the server docker container. 
 
 ### Feedback Collection Flow
 
