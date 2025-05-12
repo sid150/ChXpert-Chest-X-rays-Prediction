@@ -540,7 +540,7 @@ In a clinical setting, radiologists feed a patient’s scans into the model. The
 * **Details available** in MLflow at `http://129.114.26.91:8000` under each run's logs and artifacts.
 
 
-<pre> ``` Unit 6 and 7: MODEL SERVING AND EVALUATION \
+Unit 6 and 7: MODEL SERVING AND EVALUATION \
 Serving from an API endpoint: Describe how you set up the API endpoint. What is the input? What is the output? \
 The API endpoint is implemented using FastAPI, which serves as the backend for inference. The Flask frontend provides a web interface for users who can upload chest X-ray images. \
 Input: Single Chest X-ray (or any) image from user sent to back end as an encoded string payload. \
@@ -549,7 +549,9 @@ Identify requirements: Requirements of the customer include minimal model size f
     
 Model optimizations: Many model optimization tests were conducted using: - PyTorch compiled model - ONNX model - Graph-optimized ONNX - Dynamic + static quantized ONNX - ONNX run on CUDA, CPU, and OpenVINO EPs Best performance was with optimized ONNX on CUDA. Torch compiled model also outperformed quantized ones. /
 
-System optimizations: Dockerized services with Prometheus + Grafana monitoring, showing GPU/CPU usage, inference times, etc. System Evaluation/Monitoring: ``` </pre> 
+System optimizations: Dockerized services with Prometheus + Grafana monitoring, showing GPU/CPU usage, inference times, etc.
+/
+System Evaluation/Monitoring: 
 Docker Services Overview:
 -------------------------
 - fastapi_server: Hosts the ML model for inference and exposes metrics at /metrics.
