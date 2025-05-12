@@ -1,45 +1,76 @@
+version: '3.8'
+
 volumes:
   cheXpert:
+
 services:
   chexpert_downloader:
     image: ubuntu:20.04
     container_name: chexpert_downloader
     volumes:
-      - cheXpert:/data  # Mount the current directory to /data in the container
+      - cheXpert:/data
     working_dir: /data
     entrypoint: >
       sh -c "
-        echo 'Updating package list...'
+        echo 'Updating package list...' &&
         apt-get update &&
 
-        echo 'Installing required packages (wget, tar, unzip)...'
+        echo 'Installing required packages (wget, tar, unzip)...' &&
         apt-get install -y wget tar curl unzip &&
 
-        echo 'Downloading AzCopy...'
+        echo 'Downloading AzCopy...' &&
         wget https://aka.ms/downloadazcopy-v10-linux -O azcopy.tar.gz &&
 
-        echo 'Extracting AzCopy...'
+        echo 'Extracting AzCopy...' &&
         tar -xvf azcopy.tar.gz &&
 
-        echo 'Moving AzCopy binary to /usr/bin...'
+        echo 'Moving AzCopy binary to /usr/bin...' &&
         cp ./azcopy_linux_amd64_*/azcopy /usr/bin/ &&
         chmod +x /usr/bin/azcopy &&
 
-        echo 'Cleaning up temporary files...'
+        echo 'Cleaning up temporary files...' &&
         rm -rf azcopy.tar.gz azcopy_linux_amd64_* &&
 
-        echo 'Starting dataset download with AzCopy...'
+        echo 'Starting dataset download with AzCopy...' &&
         azcopy copy 'https://aimistanforddatasets01.blob.core.windows.net/chexpertchestxrays-u20210408?sv=2019-02-02&sr=c&sig=l%2FavBKx%2BZYBNaNTk%2F3SGgYhwrlMjhPy%2FCeq9mq858ZU%3D&st=2025-04-18T15%3A50%3A48Z&se=2025-05-18T15%3A55%3A48Z&sp=rl' . --recursive &&
 
-        echo 'Dataset download complete! Listing contents of /data:'
-        ls -lh /data &&
-
-        echo 'Now unzipping the file...'
+        echo 'Unzipping dataset...' &&
         unzip chexpertchestxrays-u20210408/'CheXpert-v1.0 batch 1 (validate & csv).zip' -d chexpertchestxrays-u20210408 &&
-        rm -rf chexpertchestxrays-u20210408/'CheXpert-v1.0 batch 1 (validate & csv).zip' &&
-        echo 'Unzipping complete! Listing contents of /data:'
+        rm -f chexpertchestxrays-u20210408/'CheXpert-v1.0 batch 1 (validate & csv).zip' &&
         ls -lh /data
       "
+
+  transform:
+    image: python:3.9-slim
+    container_name: transform_chexpert
+    volumes:
+      - cheXpert:/data
+    working_dir: /data
+    entrypoint: >
+      sh -c "
+        echo 'Installing required Python packages...' &&
+        pip install pandas scikit-learn &&
+
+        echo 'Running dataset split script...' &&
+        python3 -c \"
+import pandas as pd
+from sklearn.model_selection import train_test_split
+import os
+
+csv_path = '/data/chexpertchestxrays-u20210408/train.csv'
+df = pd.read_csv(csv_path)
+
+train, test_val = train_test_split(df, test_size=0.3, random_state=42)
+val, test = train_test_split(test_val, test_size=0.5, random_state=42)
+
+os.makedirs('/data/splits', exist_ok=True)
+train.to_csv('/data/splits/train.csv', index=False)
+val.to_csv('/data/splits/val.csv', index=False)
+test.to_csv('/data/splits/test.csv', index=False)
+print('Split complete. Files written to /data/splits/')
+        \"
+      "
+
   load-data:
     container_name: etl_load_data
     image: rclone/rclone:latest
@@ -54,15 +85,17 @@ services:
           echo "ERROR: RCLONE_CONTAINER is not set"
           exit 1
         fi
+
         echo "Cleaning up existing contents of container..."
         rclone delete chi_tacc:$RCLONE_CONTAINER --rmdirs || true
 
-        rclone copy /data/chexpertchestxrays-u20210408 chi_tacc:$RCLONE_CONTAINER \
-        --progress \
-        --transfers=32 \
-        --checkers=16 \
-        --multi-thread-streams=4 \
-        --fast-list
+        echo "Uploading processed splits to container..."
+        rclone copy /data/splits chi_tacc:$RCLONE_CONTAINER/splits \
+          --progress \
+          --transfers=32 \
+          --checkers=16 \
+          --multi-thread-streams=4 \
+          --fast-list
 
         echo "Listing directories in container after load stage:"
         rclone lsd chi_tacc:$RCLONE_CONTAINER
