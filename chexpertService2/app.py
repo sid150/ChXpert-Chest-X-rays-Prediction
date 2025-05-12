@@ -4,6 +4,7 @@ from flask import Flask, redirect, url_for, request, render_template
 from werkzeug.utils import secure_filename
 import os
 import base64
+import uuid
 
 app = Flask(__name__)
 
@@ -61,29 +62,83 @@ def upload():
         print("Uploaded image path:", img_path)
         print("FastAPI returned:", preds, probs)
 
+    # if preds and probs:
+    #     threshold = 0.5
+    #     # Find the top prediction
+    #     top_idx = probs.index(max(probs))
+    #     top_label = preds[top_idx]
+    #     top_confidence = probs[top_idx]
+    #
+    #     # Create left-aligned output
+    #     output_html = """
+    #     <div style="text-align: left;">
+    #         <h3>Prediction Results:</h3>
+    #         <ul style="list-style-type: none; padding-left: 0;">
+    #     """
+    #
+    #     for cls, prob in zip(preds, probs):
+    #         present = "Present" if prob > threshold else "Absent"
+    #         output_html += f'<li><strong>{cls}</strong>: {prob:.4f} — {present}</li>'
+    #     output_html += "</ul></div>"
+    #
+    #     return output_html
+
     if preds and probs:
         threshold = 0.5
-        # Find the top prediction
         top_idx = probs.index(max(probs))
         top_label = preds[top_idx]
         top_confidence = probs[top_idx]
 
-        # Create left-aligned output
+        # Generate unique filename
+        file_ext = os.path.splitext(f.filename)[1]  # Get extension like .jpg
+        unique_id = str(uuid.uuid4())
+        unique_filename = f"{unique_id}{file_ext}"
+        save_path = os.path.join(app.instance_path, 'uploads', unique_filename)
+        f.save(save_path)
+
+        # Prediction results
         output_html = """
         <div style="text-align: left;">
             <h3>Prediction Results:</h3>
             <ul style="list-style-type: none; padding-left: 0;">
         """
-        # for cls, prob in zip(preds, probs):
-        #     output_html += f'<li><strong>{cls}</strong>: {prob:.4f}</li>'
-        #
-        # output_html += "</ul>"
-        # output_html += f'<p><strong>Top Prediction:</strong> {top_label} ({top_confidence:.4f})</p>'
-        # output_html += "</div>"
         for cls, prob in zip(preds, probs):
             present = "Present" if prob > threshold else "Absent"
             output_html += f'<li><strong>{cls}</strong>: {prob:.4f} — {present}</li>'
         output_html += "</ul></div>"
+
+        # Prepare feedback form
+        output_html += """
+        <form id="feedback-form" method="POST" action="/submit_feedback" enctype="multipart/form-data">
+            <h4 class="mt-4">Optional Feedback (select labels for each condition):</h4>
+        """
+
+        for i, cls in enumerate(preds):
+            output_html += f"""
+            <div class="mb-2">
+                <label>{cls}:</label>
+                <select name="label_{i}" class="form-select" style="width:auto; display:inline-block;">
+                    <option value="">--</option>
+                    <option value="1">Present</option>
+                    <option value="0">Absent</option>
+                    <option value="-1">Uncertain</option>
+                </select>
+            </div>
+            """
+
+        # Add hidden fields for image metadata
+        with open(save_path, 'rb') as f:
+            image_bytes = f.read()
+        encoded_image = base64.b64encode(image_bytes).decode('utf-8')
+
+        output_html += f"""
+            <input type="hidden" name="filename" value="{unique_filename}">
+            <input type="hidden" name="image_id" value="{unique_id}">
+            <input type="hidden" name="image_b64" value="{encoded_image}">
+            <button type="submit" class="btn btn-primary mt-3">Submit Feedback</button>
+            <a href="/" class="btn btn-secondary mt-3">Skip Feedback</a>
+        </form>
+        """
 
         return output_html
 
@@ -95,6 +150,40 @@ def test():
     img_path = os.path.join(app.instance_path, 'uploads', 'test_image.jpeg')
     preds, probs = request_fastapi(img_path)
     return str(preds)
+
+
+@app.route('/submit_feedback', methods=['POST'])
+def submit_feedback():
+    labels = []
+    for i in range(14):  # Expect 14 classes
+        val = request.form.get(f'label_{i}', '')
+        labels.append(val if val in ['1', '0', '-1'] else '')
+
+    if all(label == '' for label in labels):
+        print("User skipped feedback")
+        return redirect('/')
+
+    # If user provided any feedback
+    image_id = request.form['image_id']
+    filename = request.form['filename']
+    image_b64 = request.form['image_b64']
+
+    feedback_payload = {
+        'image_id': image_id,
+        'labels': ','.join(labels)
+    }
+
+    files = {
+        'image': (filename, base64.b64decode(image_b64), 'application/octet-stream')
+    }
+
+    try:
+        response = requests.post(f"{FASTAPI_SERVER_URL}/submit-feedback", data=feedback_payload, files=files)
+        response.raise_for_status()
+        return "<div class='alert alert-success'>Feedback submitted successfully!</div><a href='/' class='btn btn-secondary mt-3'>Back</a>"
+    except Exception as e:
+        print(f"Feedback error: {e}")
+        return "<div class='alert alert-danger'>Failed to submit feedback.</div><a href='/' class='btn btn-secondary mt-3'>Back</a>"
 
 
 if __name__ == '__main__':

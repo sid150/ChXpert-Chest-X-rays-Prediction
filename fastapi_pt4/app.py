@@ -1,5 +1,5 @@
-from fastapi import FastAPI
-from fastapi import HTTPException, status
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, status
+import pandas as pd
 from pydantic import BaseModel, Field
 import base64
 import torch
@@ -93,7 +93,7 @@ for run in runs:
 
 if found_path:
     print(f"Using model from run: {selected_run_id}")
-    local_file = "./tmpModels/downloaded_modelLarge.pth"
+    local_file = "./downloaded_modelLarge.pth"
     s3.download_file(found_bucket, found_path, local_file)
     # Load it into PyTorch manually
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -107,72 +107,6 @@ else:
     local_file = "./demoModel.pt"  # can copy over densenet model on local storage in place of demo model
     model = torch.load(local_file, map_location=device)
     model.eval()
-
-# runs = client.search_runs(experiment_ids=[experiment.experiment_id],
-#                           order_by=["metrics.val_accuracy DESC"],
-#                           max_results=5)
-# best_run = runs[0]  # The first run is the best due to sorting
-# run_id = best_run.info.run_id
-# print("Best run ID:", run_id)
-# s3 = boto3.client(
-#     's3',
-#     endpoint_url='http://129.114.26.91:9000',
-#     aws_access_key_id= "myminioadmin",  # os.getenv("MINIO_ROOT_USER"),
-#     aws_secret_access_key= "myminioadmin123"  # os.getenv("MINIO_ROOT_PASSWORD")
-# )
-#
-#
-# base_prefix = f"{folder_prefix}/{run_id}/artifacts"
-# # base_prefix = f"{folder_prefix}/mlflow/runs/{run_id}/artifacts"
-# possible_paths = [
-#     f"{base_prefix}/model/data/model.pth",
-#     f"{base_prefix}/model/model.pth",
-#     f"{base_prefix}/checkpoints/latest_checkpoint.pth"
-# ]
-#
-# found_path = None
-# found_bucket = None
-#
-# for path in possible_paths:
-#     try:
-#         print(path)
-#         s3.head_object(Bucket=bucket_name, Key=path)
-#         found_path = path
-#         found_bucket = bucket_name
-#         print(found_bucket)
-#         print(found_path)
-#         break
-#     except ClientError as e:
-#         print("error")
-#         if e.response["Error"]["Code"] != "404":
-#             raise  # Unexpected error
-#
-# # === Step 4: Handle the result ===
-# if found_path:
-#     print(f"Found model checkpoint at: s3://{found_path}")
-#     local_file = "./downloaded_model.pth"
-#     s3.download_file(found_bucket, found_path, local_file)
-#
-#     # Load it into PyTorch manually
-#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#     model = torch.load(local_file, map_location=device)
-#     model.eval()
-#     print("Model loaded and ready for inference.")
-# else:
-#     print("Model checkpoint not found in any sub-bucket.")
-#     print("Getting DenseNet Model from local")
-#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#     local_file = "./mlflowModel1.pt"
-#     model = torch.load(local_file, map_location=device)
-#     model.eval()
-
-
-# # Set device (GPU if available, otherwise CPU)
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#
-# model = mlflow.pytorch.load_model(model_uri)
-# model.to(device)
-# model.eval()
 
 app = FastAPI(
     title="CheXpert X-ray classification API",
@@ -189,18 +123,6 @@ class ImageRequest(BaseModel):
 class PredictionResponse(BaseModel):
     predictions: list[str]
     probabilities: list[float]
-
-
-# Load the CheXpert model
-# try:
-#     model = mlflow.pytorch.load_model(model_uri)
-#     print("Model loaded successfully from MLflow.")
-# except Exception as e:
-#     print(f"Failed to load model from MLflow: {e}")
-#     MODEL_PATH = "demoModel.pt"
-#     model = torch.jit.load(MODEL_PATH)
-#     model.to(device)
-#     model.eval()
 
 
 # Define class labels
@@ -233,6 +155,57 @@ def preprocess_image(img):
     ])
 
     return transform(img).unsqueeze(0)
+
+
+@app.post("/submit-feedback")
+async def submit_feedback(
+        labels: str = Form(None),
+        image_id: str = Form(None),
+        filename: str = Form(None),
+        image_b64: str = Form(None)
+):
+    new_data_bucket = "newdata"
+    csv_key = "new_data.csv"
+
+    # Skip feedback case
+    if not labels or not image_id or not image_b64:
+        return {"message": "Feedback not submitted (skipped by user)."}
+
+    try:
+        # Try to download existing CSV from MinIO
+        try:
+            s3.download_file(new_data_bucket, csv_key, "/tmp/new_data.csv")
+            df = pd.read_csv("/tmp/new_data.csv")
+        except ClientError as e:
+            if e.response['Error']['Code'] == "404":
+                df = pd.DataFrame(columns=["image_id"] + [f"class_{i}" for i in range(14)])
+            else:
+                raise
+
+        # Parse labels
+        label_list = labels.split(",")
+        if len(label_list) != 14:
+            raise HTTPException(status_code=400, detail="Invalid label list (should have 14 values).")
+
+        # Append row
+        new_row = {"image_id": image_id}
+        for i in range(14):
+            new_row[f"class_{i}"] = label_list[i]
+
+        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+
+        # Save CSV and upload
+        df.to_csv("/tmp/new_data.csv", index=False)
+        s3.upload_file("/tmp/new_data.csv", new_data_bucket, csv_key)
+
+        # Save image to MinIO
+        image_bytes = base64.b64decode(image_b64)
+        s3.put_object(Bucket=new_data_bucket, Key=f"feedback_images/{filename}", Body=image_bytes)
+
+        return {"message": "Feedback saved successfully."}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/predict")

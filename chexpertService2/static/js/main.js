@@ -49,3 +49,42 @@ $(document).ready(function () {
         });
     });
 });
+
+// Feedback form handler
+$(document).on('submit', '#feedback-form', function (e) {
+    e.preventDefault();
+
+    // Build label string (from 14 dropdowns)
+    let labels = [];
+    for (let i = 0; i < 14; i++) {
+        const val = $(`select[name='label_${i}']`).val();
+        labels.push(val || ""); // push empty string if none selected
+    }
+
+    // Set the final labels string into a hidden input (or add dynamically)
+    if ($('#feedback-form input[name="labels"]').length === 0) {
+        $('<input>').attr({
+            type: 'hidden',
+            name: 'labels',
+            value: labels.join(',')
+        }).appendTo('#feedback-form');
+    } else {
+        $('#feedback-form input[name="labels"]').val(labels.join(','));
+    }
+
+    // Submit form with AJAX
+    const formData = new FormData(this);
+    $.ajax({
+        type: 'POST',
+        url: 'http://127.0.0.1:8000/submit-feedback',  // or use your actual FastAPI host
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function (data) {
+            alert(data.message);
+        },
+        error: function (xhr) {
+            alert("Feedback failed: " + xhr.responseJSON.detail);
+        }
+    });
+});
