@@ -551,7 +551,8 @@ Model optimizations: Many model optimization tests were conducted using: - PyTor
 
 System optimizations: Dockerized services with Prometheus + Grafana monitoring, showing GPU/CPU usage, inference times, etc.
 /
-System Evaluation/Monitoring: 
+System Evaluation/Monitoring:
+
 Docker Services Overview:
 -------------------------
 - fastapi_server: Hosts the ML model for inference and exposes metrics at /metrics.
