@@ -540,7 +540,7 @@ In a clinical setting, radiologists feed a patient’s scans into the model. The
 * **Details available** in MLflow at `http://129.114.26.91:8000` under each run's logs and artifacts.
 
 
-## Unit 6 and 7: MODEL SERVING AND EVALUATION \
+## Unit 6 and 7: MODEL SERVING AND EVALUATION
 Serving from an API endpoint: Describe how you set up the API endpoint. What is the input? What is the output? \
 The API endpoint is implemented using FastAPI, which serves as the backend for inference. The Flask frontend provides a web interface for users who can upload chest X-ray images. \
 Input: Single Chest X-ray (or any) image from user sent to back end as an encoded string payload. \
