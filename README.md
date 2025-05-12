@@ -48,7 +48,7 @@ link to their contributions in all repos here. -->
 
 
 ### System diagram
-<img width="1503" alt="Image" src="https://github.com/user-attachments/assets/c5327eb2-3474-4a60-a473-2e092ac14af6" />
+![Image](https://github.com/user-attachments/assets/42ac8251-d529-4940-ac63-fc683ccb02ec)
 <!-- Overall digram of system. Doesn't need polish, does need to show all the pieces. 
 Must include: all the hardware, all the containers/software platforms, all the models, 
 all the data. -->
