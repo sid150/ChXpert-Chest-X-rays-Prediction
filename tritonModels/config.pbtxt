@@ -1,0 +1,32 @@
+name: "chexpert_classifier"
+backend: "python"
+max_batch_size: 8
+
+input [
+  {
+    name: "INPUT_IMAGE"
+    data_type: TYPE_STRING
+    dims: [1]
+  }
+]
+
+output [
+  {
+    name: "CLASS_LABELS"
+    data_type: TYPE_STRING
+    dims: [14]
+  },
+  {
+    name: "CONFIDENCES"
+    data_type: TYPE_FP32
+    dims: [14]
+  }
+]
+
+instance_group [
+  {
+    count: 1
+    kind: KIND_GPU
+    gpus: [0]
+  }
+]
