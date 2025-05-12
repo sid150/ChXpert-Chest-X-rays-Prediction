@@ -25,6 +25,7 @@ prometheus-client
 lightning
 boto3
 peft
+python-multipart
 
 # CPU-only PyTorch (matching your updated version)
 --extra-index-url https://download.pytorch.org/whl/cpu
