@@ -93,7 +93,7 @@ for run in runs:
 
 if found_path:
     print(f"Using model from run: {selected_run_id}")
-    local_file = "./tmpModels/downloaded_modelLarge.pth"
+    local_file = "./downloaded_modelLarge.pth"
     s3.download_file(found_bucket, found_path, local_file)
     # Load it into PyTorch manually
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
