@@ -608,11 +608,11 @@ The grafana panels include service monitoring with requests per second info, ave
 Additionally, handling human feedback has been implemented.
 This MLOps system supports human-in-the-loop feedback on predictions to enhance model monitoring and retraining efforts.
 
-Also, Model optimizations are done using onnx runtime, compiled torch model, and different onnx execution providers including GPU.
-[Torch inference test](https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/blob/main/inferenceTesting/measure_torch.ipynb)
-[Compiled Torch](https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/blob/main/inferenceTesting/measure_torch_compiled.ipynb)
-[Onnx](https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/blob/main/inferenceTesting/onnxInferenceNodeTest2.ipynb)
-[OpenVINO](https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/blob/main/inferenceTesting/openvinoTest.ipynb)
+Also, Model optimizations are done using onnx runtime, compiled torch model, and different onnx execution providers including GPU. \
+[Torch inference test](https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/blob/main/inferenceTesting/measure_torch.ipynb) \
+[Compiled Torch](https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/blob/main/inferenceTesting/measure_torch_compiled.ipynb) \
+[Onnx](https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/blob/main/inferenceTesting/onnxInferenceNodeTest2.ipynb) \
+[OpenVINO](https://github.com/sid150/ChXpert-Chest-X-rays-Prediction/blob/main/inferenceTesting/openvinoTest.ipynb) \
 Due to system development being late, the fastapi server uses a direct torch model for serving. It attempts to load the best validation accuracy model it can find from mlflow run id and matches it to the minio block storage. If it doesn't find a model on minio, it will load a local model in the server docker container. 
 
 ### Feedback Collection Flow
