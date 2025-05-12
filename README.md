@@ -540,17 +540,16 @@ In a clinical setting, radiologists feed a patient’s scans into the model. The
 * **Details available** in MLflow at `http://129.114.26.91:8000` under each run's logs and artifacts.
 
 
-Unit 6 and 7: MODEL SERVING AND EVALUATION PERSON - 2 minutes
-Serving from an API endpoint: Describe how you set up the API endpoint. What is the input? What is the output?
-The API endpoint is implemented using FastAPI, which serves as the backend for inference. The Flask dontend provides a web interface for users who can upload chest X-ray images from their local machine.
-Input: Single Chest X-ray (or any) image from user sent to back end as an encoded string payload. 
-Output: The predictions of the model and the confidence levels for each class are then sent to the frontend and displayed under the uploaded image once the “submit” button has been pressed.
-Identify requirements: Discuss requirements with respect to the specific customer.
-Requirements of the customer in mind include, not too large of model size for serving, less than 5 GB, which is met by both densenet and ViT models. The regular torch ViT model for inferencing only takes 160 ms to inference a single image(Grafana monitoring) which is well below the customer’s required few seconds. 
-Model optimizations: Show the part of your repo that implements this, and discuss the results!
-Many model optimization tests were done utilizing a pytorch compiled model, onnx model, graph optimized onnx model, a dynamic quantized onnx model, a conservatively and static quantized onnx model. The onnx models were also tested on CUDA execution provider along with CPU execution provider. The regular onnx model was also tested on OpenVINO execution provider. The cuda execution provider with optimized onnx model ran fastest for batch inferencing, then the cuda provider with regular onnx model, then the OpenVINO with regular onnx model, then finally the regular onnx model with CPU provider. The compiled torch model actually ran better than any of the quantized models and the regular torch model ran the slowest. 
-System optimizations: Show the part of your repo that implements this, and discuss the results!
-System Evaluation/Monitoring:  
+<pre> ``` Unit 6 and 7: MODEL SERVING AND EVALUATION \
+Serving from an API endpoint: Describe how you set up the API endpoint. What is the input? What is the output? \
+The API endpoint is implemented using FastAPI, which serves as the backend for inference. The Flask frontend provides a web interface for users who can upload chest X-ray images. \
+Input: Single Chest X-ray (or any) image from user sent to back end as an encoded string payload. \
+Output: The predictions of the model and the confidence levels for each class are then sent to the frontend and displayed. \
+Identify requirements: Requirements of the customer include minimal model size for serving (under 5 GB), which is met by both DenseNet and ViT models. The regular Torch ViT model takes ~160 ms to inference a single image (Grafana monitored), well under the required few seconds. \ 
+    
+Model optimizations: Many model optimization tests were conducted using: - PyTorch compiled model - ONNX model - Graph-optimized ONNX - Dynamic + static quantized ONNX - ONNX run on CUDA, CPU, and OpenVINO EPs Best performance was with optimized ONNX on CUDA. Torch compiled model also outperformed quantized ones. /
+
+System optimizations: Dockerized services with Prometheus + Grafana monitoring, showing GPU/CPU usage, inference times, etc. System Evaluation/Monitoring: ``` </pre> 
 Docker Services Overview:
 -------------------------
 - fastapi_server: Hosts the ML model for inference and exposes metrics at /metrics.
